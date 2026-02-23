@@ -28,6 +28,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         webViewController.setTrayManager(trayManager)
         webViewController.setPreferencesWindowController(preferencesWindowController)
 
+        Task {
+            await SyncEngine.shared.startAutoSyncIfNeeded()
+        }
+
         // Show window on launch
         mainWindow.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)

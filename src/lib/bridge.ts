@@ -256,6 +256,80 @@ export const bridge = {
     return Promise.resolve([]);
   },
 
+  // --- Sync (Beta) ---
+
+  syncGetSettings: (): Promise<Record<string, unknown>> => {
+    if (isSwiftAvailable()) {
+      return window.swiftBridge!.call("syncGetSettings") as Promise<Record<string, unknown>>;
+    }
+    return Promise.resolve({
+      enabled: false,
+      serverURL: "",
+      workspaceId: "",
+      deviceName: "Mac",
+      deviceId: "dev-local",
+      mode: "auto",
+      intervalSeconds: 60,
+      direction: "bidirectional",
+      conflictPolicy: "latest_modified_wins",
+      hasToken: false,
+      apiTokenMasked: "",
+    });
+  },
+
+  syncSetSettings: (settings: Record<string, unknown>): Promise<Record<string, unknown>> => {
+    if (isSwiftAvailable()) {
+      return window.swiftBridge!.call("syncSetSettings", { settings }, 15000) as Promise<Record<string, unknown>>;
+    }
+    return Promise.resolve({ ok: true, settings });
+  },
+
+  syncGetStatus: (): Promise<Record<string, unknown>> => {
+    if (isSwiftAvailable()) {
+      return window.swiftBridge!.call("syncGetStatus", {}, 15000) as Promise<Record<string, unknown>>;
+    }
+    return Promise.resolve({
+      enabled: false,
+      configured: false,
+      isRunning: false,
+      pendingUploads: 0,
+      pendingDownloads: 0,
+      health: "gray",
+      lastError: null,
+      lastSyncAtMs: null,
+    });
+  },
+
+  syncRunNow: (): Promise<Record<string, unknown>> => {
+    if (isSwiftAvailable()) {
+      return window.swiftBridge!.call("syncRunNow", {}, 120000) as Promise<Record<string, unknown>>;
+    }
+    return Promise.resolve({ ok: false, error: "Swift bridge unavailable" });
+  },
+
+  syncGetLastErrors: (): Promise<Array<Record<string, unknown>>> => {
+    if (isSwiftAvailable()) {
+      return window.swiftBridge!.call("syncGetLastErrors", {}, 15000) as Promise<
+        Array<Record<string, unknown>>
+      >;
+    }
+    return Promise.resolve([]);
+  },
+
+  syncResetCursor: (): Promise<Record<string, unknown>> => {
+    if (isSwiftAvailable()) {
+      return window.swiftBridge!.call("syncResetCursor", {}, 15000) as Promise<Record<string, unknown>>;
+    }
+    return Promise.resolve({ ok: true });
+  },
+
+  syncTestConnection: (): Promise<Record<string, unknown>> => {
+    if (isSwiftAvailable()) {
+      return window.swiftBridge!.call("syncTestConnection", {}, 30000) as Promise<Record<string, unknown>>;
+    }
+    return Promise.resolve({ ok: false, error: "Swift bridge unavailable" });
+  },
+
   // Event listeners (Swift → React via CustomEvent)
   on: (event: string, callback: () => void): (() => void) => {
     const handler = () => callback();

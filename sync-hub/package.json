@@ -1,0 +1,17 @@
+{
+  "name": "freecast-sync-hub",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@fastify/rate-limit": "^10.3.0",
+    "better-sqlite3": "^11.10.0",
+    "fastify": "^5.6.1"
+  }
+}

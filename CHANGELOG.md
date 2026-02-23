@@ -4,6 +4,19 @@ All notable changes to FreeCast Notes are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Remote Sync (Beta)** — New sync backend (`sync-hub/`, Fastify + SQLite) with `health`, `manifest`, `push`, `pull`, and `state` endpoints for syncing a FreeCast vault with a VPS workspace folder.
+- **Sync Engine (Swift)** — Local vault scanner + sync client (`SyncEngine`, `SyncAPIClient`, `SyncSettings`, `SyncStateStore`) with manual sync and persisted cursor/state.
+- **Sync settings in Preferences** — New **Sync (Beta)** section with server/workspace/device settings, token update (Keychain), mode/interval/direction controls, status, test connection, sync now, and sync logs.
+- **Auto-sync (Beta)** — Background auto-sync loop in the macOS app with basic retry backoff after errors.
+
+### Changed
+
+- **Documentation** — README now includes a full “Remote Sync (Beta)” section with architecture, server setup, app setup, security, conflict policy, and troubleshooting.
+
 ## [1.1.0] - 2025-02-18
 
 ### Added

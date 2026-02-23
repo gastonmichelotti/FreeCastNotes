@@ -1,9 +1,16 @@
 # Dependencies
 node_modules/
+sync-hub/node_modules/
 
 # Build output
 dist/
 build/
+
+# Sync hub local data
+sync-hub/.data/
+sync-hub/*.sqlite
+sync-hub/*.sqlite-*
+sync-hub/.env
 
 # Swift
 swift-app/.build/

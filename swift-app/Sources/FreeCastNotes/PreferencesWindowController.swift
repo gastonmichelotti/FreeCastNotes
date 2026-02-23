@@ -116,6 +116,49 @@ class PreferencesWindowController: NSObject, WKScriptMessageHandler, WKNavigatio
                 handleSetLaunchAtLogin(enabled: enabled, callId: callId)
             }
 
+        case "syncGetSettings":
+            Task { [weak self] in
+                let result = await SyncEngine.shared.getSettings()
+                self?.respond(callId: callId, type: type, result: result)
+            }
+
+        case "syncSetSettings":
+            let settingsPayload = (payload?["settings"] as? [String: Any]) ?? payload ?? [:]
+            Task { [weak self] in
+                let result = await SyncEngine.shared.setSettings(settingsPayload)
+                self?.respond(callId: callId, type: type, result: result)
+            }
+
+        case "syncGetStatus":
+            Task { [weak self] in
+                let result = await SyncEngine.shared.getStatus()
+                self?.respond(callId: callId, type: type, result: result)
+            }
+
+        case "syncRunNow":
+            Task { [weak self] in
+                let result = await SyncEngine.shared.runNow()
+                self?.respond(callId: callId, type: type, result: result)
+            }
+
+        case "syncGetLastErrors":
+            Task { [weak self] in
+                let result = await SyncEngine.shared.getLastErrors()
+                self?.respond(callId: callId, type: type, result: result)
+            }
+
+        case "syncResetCursor":
+            Task { [weak self] in
+                let result = await SyncEngine.shared.resetCursor()
+                self?.respond(callId: callId, type: type, result: result)
+            }
+
+        case "syncTestConnection":
+            Task { [weak self] in
+                let result = await SyncEngine.shared.testConnection()
+                self?.respond(callId: callId, type: type, result: result)
+            }
+
         default:
             break
         }
