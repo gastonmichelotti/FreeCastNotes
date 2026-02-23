@@ -16,13 +16,13 @@ const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "Meta"]);
 
 type SyncSettingsDraft = {
   enabled: boolean;
-  serverURL: string;
+  baseUrl: string;
   workspaceId: string;
   deviceName: string;
   deviceId: string;
   mode: "manual" | "auto";
-  intervalSeconds: 30 | 60 | 300;
-  direction: "upload_only" | "download_only" | "bidirectional";
+  intervalSec: 30 | 60 | 300;
+  direction: "upload" | "download" | "bidirectional";
   conflictPolicy: "latest_modified_wins";
   hasToken: boolean;
   apiTokenMasked: string;
@@ -33,7 +33,7 @@ type SyncStatus = {
   configured: boolean;
   isRunning: boolean;
   mode: string;
-  intervalSeconds: number;
+  intervalSec: number;
   direction: string;
   conflictPolicy: string;
   lastSyncAtMs: number | null;
@@ -48,12 +48,12 @@ type SyncLogEntry = { tsMs: number; message: string };
 
 const DEFAULT_SYNC_SETTINGS: SyncSettingsDraft = {
   enabled: false,
-  serverURL: "",
+  baseUrl: "",
   workspaceId: "",
   deviceName: "Mac",
   deviceId: "mac-local",
   mode: "auto",
-  intervalSeconds: 60,
+  intervalSec: 60,
   direction: "bidirectional",
   conflictPolicy: "latest_modified_wins",
   hasToken: false,
@@ -65,7 +65,7 @@ const DEFAULT_SYNC_STATUS: SyncStatus = {
   configured: false,
   isRunning: false,
   mode: "auto",
-  intervalSeconds: 60,
+  intervalSec: 60,
   direction: "bidirectional",
   conflictPolicy: "latest_modified_wins",
   lastSyncAtMs: null,
@@ -100,6 +100,7 @@ export default function PreferencesPanel({
   const [syncTokenInput, setSyncTokenInput] = useState("");
   const [syncLogsOpen, setSyncLogsOpen] = useState(false);
   const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>([]);
+  const [savedSyncSettings, setSavedSyncSettings] = useState<SyncSettingsDraft>(DEFAULT_SYNC_SETTINGS);
 
   const refreshSyncState = async () => {
     try {
@@ -108,8 +109,12 @@ export default function PreferencesPanel({
         bridge.syncGetSettings(),
         bridge.syncGetStatus(),
       ]);
-      setSyncSettings(parseSyncSettings(rawSettings));
+      const parsedSettings = parseSyncSettings(rawSettings);
+      setSyncSettings(parsedSettings);
+      setSavedSyncSettings(parsedSettings);
       setSyncStatus(parseSyncStatus(rawStatus));
+      setSyncTokenInput("");
+      setSyncFeedback(null);
     } catch {
       setSyncFeedback("Could not load sync settings/status.");
     } finally {
@@ -117,13 +122,44 @@ export default function PreferencesPanel({
     }
   };
 
-  const saveSyncSettingsPatch = async (patch: Partial<SyncSettingsDraft>) => {
-    const next = { ...syncSettings, ...patch };
-    setSyncSettings(next);
+  const handleSaveSyncSettings = async () => {
+    const token = syncTokenInput.trim();
+    const next = { ...syncSettings };
+    const requiresCompleteConfig = next.enabled || next.baseUrl.trim().length > 0;
+    if (next.baseUrl && !isAllowedSyncBaseUrl(next.baseUrl)) {
+      setSyncFeedback("Use HTTPS for remote servers. HTTP is only allowed for localhost.");
+      return;
+    }
+    if (requiresCompleteConfig && next.baseUrl.trim().length === 0) {
+      setSyncFeedback("Sync Server Base URL is required when sync is enabled.");
+      return;
+    }
+    if (requiresCompleteConfig && next.workspaceId.trim().length === 0) {
+      setSyncFeedback("Workspace ID is required.");
+      return;
+    }
+    if (token.length > 0 && token.length < 8) {
+      setSyncFeedback("API token must be at least 8 characters.");
+      return;
+    }
+
     setSyncSaving(true);
     setSyncFeedback(null);
     try {
-      const result = await bridge.syncSetSettings(patch as Record<string, unknown>);
+      const payload: Record<string, unknown> = {
+        enabled: next.enabled,
+        baseUrl: next.baseUrl.trim(),
+        workspaceId: next.workspaceId.trim(),
+        deviceName: next.deviceName.trim(),
+        deviceId: next.deviceId.trim(),
+        mode: next.mode,
+        intervalSec: next.intervalSec,
+        direction: next.direction,
+        conflictPolicy: next.conflictPolicy,
+      };
+      if (syncTokenInput.length > 0) payload.apiToken = token;
+
+      const result = await bridge.syncSetSettings(payload);
       const ok = Boolean((result as { ok?: unknown }).ok);
       if (!ok) {
         const message = getString((result as Record<string, unknown>).error) ?? "Failed to save sync settings";
@@ -131,8 +167,12 @@ export default function PreferencesPanel({
       } else {
         const saved = (result as Record<string, unknown>).settings;
         if (saved && typeof saved === "object") {
-          setSyncSettings(parseSyncSettings(saved as Record<string, unknown>));
+          const parsed = parseSyncSettings(saved as Record<string, unknown>);
+          setSyncSettings(parsed);
+          setSavedSyncSettings(parsed);
         }
+        if (syncTokenInput.length > 0) setSyncTokenInput("");
+        setSyncFeedback("Sync settings saved");
         const statusRaw = await bridge.syncGetStatus();
         setSyncStatus(parseSyncStatus(statusRaw));
       }
@@ -140,6 +180,18 @@ export default function PreferencesPanel({
       setSyncFeedback(e instanceof Error ? e.message : "Failed to save sync settings");
     } finally {
       setSyncSaving(false);
+    }
+  };
+
+  const handleResetSyncSettings = async () => {
+    setSyncSettings(savedSyncSettings);
+    setSyncTokenInput("");
+    setSyncFeedback("Sync settings reset");
+    try {
+      const statusRaw = await bridge.syncGetStatus();
+      setSyncStatus(parseSyncStatus(statusRaw));
+    } catch {
+      // no-op
     }
   };
 
@@ -203,34 +255,6 @@ export default function PreferencesPanel({
     }
   };
 
-  const handleSyncTokenUpdate = async () => {
-    const token = syncTokenInput.trim();
-    if (token.length > 0 && token.length < 8) {
-      setSyncFeedback("API token must be at least 8 characters.");
-      return;
-    }
-    setSyncSaving(true);
-    try {
-      const result = await bridge.syncSetSettings({ apiToken: token });
-      const ok = Boolean((result as { ok?: unknown }).ok);
-      if (!ok) {
-        setSyncFeedback(getString((result as Record<string, unknown>).error) ?? "Failed to update token");
-        return;
-      }
-      const saved = (result as Record<string, unknown>).settings;
-      if (saved && typeof saved === "object") {
-        setSyncSettings(parseSyncSettings(saved as Record<string, unknown>));
-      }
-      setSyncTokenInput("");
-      setSyncFeedback(token ? "API token updated" : "API token cleared");
-      const statusRaw = await bridge.syncGetStatus();
-      setSyncStatus(parseSyncStatus(statusRaw));
-    } catch (e) {
-      setSyncFeedback(e instanceof Error ? e.message : "Failed to update token");
-    } finally {
-      setSyncSaving(false);
-    }
-  };
 
   useEffect(() => {
     if (!open && !standalone) return;
@@ -339,14 +363,23 @@ export default function PreferencesPanel({
     }
   };
 
-  const syncServerURLValid =
-    !syncSettings.serverURL.trim() || isHttpUrl(syncSettings.serverURL.trim());
+  const syncBaseUrlValid =
+    !syncSettings.baseUrl.trim() || isAllowedSyncBaseUrl(syncSettings.baseUrl.trim());
   const syncWorkspaceIdValid = syncSettings.workspaceId.trim().length > 0;
+  const syncDirty =
+    JSON.stringify({
+      ...syncSettings,
+      baseUrl: syncSettings.baseUrl.trim(),
+      workspaceId: syncSettings.workspaceId.trim(),
+      deviceName: syncSettings.deviceName.trim(),
+      deviceId: syncSettings.deviceId.trim(),
+    }) !== JSON.stringify(savedSyncSettings) || syncTokenInput.length > 0;
   const syncCanRunActions =
-    syncSettings.serverURL.trim().length > 0 &&
-    syncServerURLValid &&
+    syncSettings.baseUrl.trim().length > 0 &&
+    syncBaseUrlValid &&
     syncWorkspaceIdValid &&
     syncSettings.hasToken &&
+    !syncDirty &&
     !syncStatus.isRunning;
   const syncHealthDotClass =
     syncStatus.health === "green"
@@ -505,8 +538,7 @@ export default function PreferencesPanel({
               </div>
               <button
                 type="button"
-                onClick={() => void saveSyncSettingsPatch({ enabled: !syncSettings.enabled })}
-                disabled={syncSaving}
+                onClick={() => setSyncSettings((s) => ({ ...s, enabled: !s.enabled }))}
                 className={`shrink-0 rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
                   syncSettings.enabled
                     ? "bg-[#FF5F5A]/22 text-[#E5E5E7]"
@@ -515,6 +547,12 @@ export default function PreferencesPanel({
               >
                 {syncSettings.enabled ? "On" : "Off"}
               </button>
+            </div>
+
+            <div className="rounded-lg border border-amber-200/20 bg-amber-300/8 px-3 py-2">
+              <p className="text-[11px] text-amber-100/85">
+                Sync sends your notes and attachments to the configured server. Only use a server you trust.
+              </p>
             </div>
 
             <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
@@ -538,6 +576,8 @@ export default function PreferencesPanel({
                 <span className="text-right text-[#E5E5E7]/80">{syncStatus.pendingDownloads}</span>
                 <span>Configured</span>
                 <span className="text-right text-[#E5E5E7]/80">{syncStatus.configured ? "Yes" : "No"}</span>
+                <span>Mode</span>
+                <span className="text-right text-[#E5E5E7]/80 capitalize">{syncStatus.mode}</span>
               </div>
               {syncStatus.lastError && (
                 <p className="mt-2 truncate text-[11px] text-rose-200" title={syncStatus.lastError}>
@@ -551,26 +591,20 @@ export default function PreferencesPanel({
 
             <div className="space-y-2">
               <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
-                Server URL
+                Sync Server Base URL
               </label>
               <input
-                value={syncSettings.serverURL}
-                onChange={(e) => setSyncSettings((s) => ({ ...s, serverURL: e.target.value }))}
-                onBlur={() => {
-                  const next = syncSettings.serverURL.trim();
-                  if (next && !isHttpUrl(next)) {
-                    setSyncFeedback("Enter a valid http(s) URL.");
-                    return;
-                  }
-                  void saveSyncSettingsPatch({ serverURL: next });
-                }}
-                placeholder="https://sync.tudominio.com"
+                value={syncSettings.baseUrl}
+                onChange={(e) => setSyncSettings((s) => ({ ...s, baseUrl: e.target.value }))}
+                placeholder="https://sync.example.com"
                 className={`w-full rounded-lg border bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none ${
-                  syncServerURLValid ? "border-white/10 focus:border-white/25" : "border-rose-300/40"
+                  syncBaseUrlValid ? "border-white/10 focus:border-white/25" : "border-rose-300/40"
                 }`}
               />
-              {!syncServerURLValid && (
-                <p className="text-[11px] text-rose-200">Enter a valid http(s) URL.</p>
+              {!syncBaseUrlValid && (
+                <p className="text-[11px] text-rose-200">
+                  Use HTTPS for remote servers. HTTP is allowed only for localhost (dev).
+                </p>
               )}
             </div>
 
@@ -582,7 +616,6 @@ export default function PreferencesPanel({
                 <input
                   value={syncSettings.workspaceId}
                   onChange={(e) => setSyncSettings((s) => ({ ...s, workspaceId: e.target.value }))}
-                  onBlur={() => void saveSyncSettingsPatch({ workspaceId: syncSettings.workspaceId.trim() })}
                   placeholder="gato-main"
                   className={`w-full rounded-lg border bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none ${
                     syncWorkspaceIdValid ? "border-white/10 focus:border-white/25" : "border-rose-300/40"
@@ -596,7 +629,6 @@ export default function PreferencesPanel({
                 <input
                   value={syncSettings.deviceId}
                   onChange={(e) => setSyncSettings((s) => ({ ...s, deviceId: e.target.value }))}
-                  onBlur={() => void saveSyncSettingsPatch({ deviceId: syncSettings.deviceId.trim() })}
                   className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none focus:border-white/25"
                 />
               </div>
@@ -606,37 +638,28 @@ export default function PreferencesPanel({
               <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
                 Device Name
               </label>
-              <input
-                value={syncSettings.deviceName}
-                onChange={(e) => setSyncSettings((s) => ({ ...s, deviceName: e.target.value }))}
-                onBlur={() => void saveSyncSettingsPatch({ deviceName: syncSettings.deviceName.trim() })}
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none focus:border-white/25"
-              />
+                <input
+                  value={syncSettings.deviceName}
+                  onChange={(e) => setSyncSettings((s) => ({ ...s, deviceName: e.target.value }))}
+                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none focus:border-white/25"
+                />
             </div>
 
             <div className="space-y-2">
               <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
                 API Token
               </label>
-              <div className="flex items-center gap-2">
-                <input
-                  value={syncTokenInput}
-                  onChange={(e) => setSyncTokenInput(e.target.value)}
-                  type="password"
-                  placeholder={syncSettings.apiTokenMasked || "Set API token"}
-                  className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none focus:border-white/25"
-                />
-                <button
-                  type="button"
-                  onClick={() => void handleSyncTokenUpdate()}
-                  disabled={syncSaving}
-                  className="shrink-0 rounded-md bg-white/10 px-2.5 py-1.5 text-[11px] text-[#E5E5E7]/85 transition-colors hover:bg-white/15 disabled:opacity-50"
-                >
-                  Update
-                </button>
-              </div>
+              <input
+                value={syncTokenInput}
+                onChange={(e) => setSyncTokenInput(e.target.value)}
+                type="password"
+                placeholder={syncSettings.apiTokenMasked || "Set API token"}
+                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none focus:border-white/25"
+              />
               <p className="text-[11px] text-[#E5E5E7]/40">
-                {syncSettings.hasToken ? "Token saved in Keychain." : "No token saved."}
+                {syncSettings.hasToken
+                  ? "Token is stored in Keychain. Enter a new token to replace it, then click Save."
+                  : "No token saved. Enter a token and click Save."}
               </p>
             </div>
 
@@ -647,7 +670,7 @@ export default function PreferencesPanel({
                 </label>
                 <select
                   value={syncSettings.mode}
-                  onChange={(e) => void saveSyncSettingsPatch({ mode: e.target.value as SyncSettingsDraft["mode"] })}
+                  onChange={(e) => setSyncSettings((s) => ({ ...s, mode: e.target.value as SyncSettingsDraft["mode"] }))}
                   className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none"
                 >
                   <option value="manual">Manual</option>
@@ -656,11 +679,11 @@ export default function PreferencesPanel({
               </div>
               <div className="space-y-2">
                 <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
-                  Interval
+                  Auto interval
                 </label>
                 <select
-                  value={String(syncSettings.intervalSeconds)}
-                  onChange={(e) => void saveSyncSettingsPatch({ intervalSeconds: Number(e.target.value) as 30 | 60 | 300 })}
+                  value={String(syncSettings.intervalSec)}
+                  onChange={(e) => setSyncSettings((s) => ({ ...s, intervalSec: Number(e.target.value) as 30 | 60 | 300 }))}
                   className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none"
                 >
                   <option value="30">30s</option>
@@ -677,11 +700,11 @@ export default function PreferencesPanel({
                 </label>
                 <select
                   value={syncSettings.direction}
-                  onChange={(e) => void saveSyncSettingsPatch({ direction: e.target.value as SyncSettingsDraft["direction"] })}
+                  onChange={(e) => setSyncSettings((s) => ({ ...s, direction: e.target.value as SyncSettingsDraft["direction"] }))}
                   className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none"
                 >
-                  <option value="upload_only">Upload only</option>
-                  <option value="download_only">Download only</option>
+                  <option value="upload">Upload only</option>
+                  <option value="download">Download only</option>
                   <option value="bidirectional">Bidirectional</option>
                 </select>
               </div>
@@ -691,7 +714,7 @@ export default function PreferencesPanel({
                 </label>
                 <select
                   value={syncSettings.conflictPolicy}
-                  onChange={(e) => void saveSyncSettingsPatch({ conflictPolicy: e.target.value as SyncSettingsDraft["conflictPolicy"] })}
+                  onChange={(e) => setSyncSettings((s) => ({ ...s, conflictPolicy: e.target.value as SyncSettingsDraft["conflictPolicy"] }))}
                   className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none"
                 >
                   <option value="latest_modified_wins">Latest modified wins</option>
@@ -699,11 +722,30 @@ export default function PreferencesPanel({
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => void handleSaveSyncSettings()}
+                disabled={syncSaving || !syncDirty}
+                className="rounded-md bg-[#FF5F5A]/18 px-2.5 py-2 text-[11px] text-[#E5E5E7] transition-colors hover:bg-[#FF5F5A]/28 disabled:opacity-50"
+              >
+                {syncSaving ? "Saving…" : "Save"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleResetSyncSettings()}
+                disabled={syncSaving || !syncDirty}
+                className="rounded-md border border-white/10 bg-white/5 px-2.5 py-2 text-[11px] text-[#E5E5E7]/80 transition-colors hover:bg-white/8 disabled:opacity-50"
+              >
+                Reset
+              </button>
+            </div>
+
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => void handleSyncTestConnection()}
-                disabled={syncActionBusy !== null || !syncServerURLValid || !syncSettings.serverURL.trim()}
+                disabled={syncActionBusy !== null || !syncBaseUrlValid || !syncSettings.baseUrl.trim()}
                 className="rounded-md border border-white/10 bg-white/5 px-2.5 py-2 text-[11px] text-[#E5E5E7]/80 transition-colors hover:bg-white/8 disabled:opacity-50"
               >
                 {syncActionBusy === "test" ? "Testing…" : "Test Connection"}
@@ -879,12 +921,12 @@ function formatShortcut(shortcut: string): string {
 function parseSyncSettings(raw: Record<string, unknown>): SyncSettingsDraft {
   return {
     enabled: getBoolean(raw.enabled, DEFAULT_SYNC_SETTINGS.enabled),
-    serverURL: getString(raw.serverURL) ?? DEFAULT_SYNC_SETTINGS.serverURL,
+    baseUrl: getString(raw.baseUrl) ?? getString(raw.serverURL) ?? DEFAULT_SYNC_SETTINGS.baseUrl,
     workspaceId: getString(raw.workspaceId) ?? DEFAULT_SYNC_SETTINGS.workspaceId,
     deviceName: getString(raw.deviceName) ?? DEFAULT_SYNC_SETTINGS.deviceName,
     deviceId: getString(raw.deviceId) ?? DEFAULT_SYNC_SETTINGS.deviceId,
     mode: (getString(raw.mode) === "manual" ? "manual" : "auto"),
-    intervalSeconds: parseInterval(raw.intervalSeconds),
+    intervalSec: parseInterval(raw.intervalSec ?? raw.intervalSeconds),
     direction: parseDirection(raw.direction),
     conflictPolicy: "latest_modified_wins",
     hasToken: getBoolean(raw.hasToken, false),
@@ -899,7 +941,7 @@ function parseSyncStatus(raw: Record<string, unknown>): SyncStatus {
     configured: getBoolean(raw.configured, false),
     isRunning: getBoolean(raw.isRunning, false),
     mode: getString(raw.mode) ?? "auto",
-    intervalSeconds: getNumber(raw.intervalSeconds, 60),
+    intervalSec: getNumber(raw.intervalSec ?? raw.intervalSeconds, 60),
     direction: getString(raw.direction) ?? "bidirectional",
     conflictPolicy: getString(raw.conflictPolicy) ?? "latest_modified_wins",
     lastSyncAtMs: getNullableNumber(raw.lastSyncAtMs),
@@ -959,14 +1001,19 @@ function parseInterval(value: unknown): 30 | 60 | 300 {
 
 function parseDirection(value: unknown): SyncSettingsDraft["direction"] {
   const s = getString(value);
-  if (s === "upload_only" || s === "download_only" || s === "bidirectional") return s;
+  if (s === "upload" || s === "download" || s === "bidirectional") return s;
+  if (s === "upload_only") return "upload";
+  if (s === "download_only") return "download";
   return "bidirectional";
 }
 
-function isHttpUrl(value: string): boolean {
+function isAllowedSyncBaseUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
+    if (url.protocol === "https:") return true;
+    if (url.protocol !== "http:") return false;
+    const host = url.hostname.toLowerCase();
+    return host === "localhost" || host === "127.0.0.1" || host === "::1";
   } catch {
     return false;
   }

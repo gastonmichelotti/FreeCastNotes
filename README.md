@@ -166,7 +166,7 @@ This approach gives us the best of both worlds: native macOS windowing behavior 
 
 FreeCastNotes can optionally sync your local vault with a remote VPS folder using a small sync hub service (`sync-hub/`). This is useful if you want to operate on notes directly on a server/workspace and let the app synchronize changes back to your Mac.
 
-### What it solves
+### What is Sync (Beta)?
 
 - Keep your local FreeCast vault in sync with a remote workspace on your VPS
 - Use the app locally while also editing/reading files on the server
@@ -187,7 +187,7 @@ VPS (freecast-sync-hub)
      /home/opc/documents/freecast-sync/workspaces/<workspaceId>/...
 ```
 
-### Server setup (VPS hub)
+### How to self-host sync server
 
 The sync hub is included in this repo under `sync-hub/`.
 
@@ -210,7 +210,7 @@ Defaults:
 - Included: `*.md`, `attachments/**`
 - Excluded: `_deleted/**`
 
-### App setup (Preferences → Sync (Beta))
+### How to configure app settings
 
 Open **Preferences** (`Cmd+,`) and configure:
 
@@ -230,7 +230,7 @@ Use the buttons:
 - `Sync Now`
 - `Open Sync Logs`
 
-### Security (minimum recommended)
+### Security notes
 
 - Protect all `/sync/*` routes with `Authorization: Bearer <token>`
 - Use HTTPS (reverse proxy / TLS) in production
@@ -253,6 +253,13 @@ Use the buttons:
 - **Sync says configured = No**: check `Server URL`, `Workspace ID`, and that an API token is saved (Keychain)
 - **Large attachments rejected**: increase `SYNC_BODY_LIMIT_MB` or reduce attachment size / split syncs
 - **File blocked / write error on Mac**: verify the vault folder is writable and no external process is locking the file
+
+### No vendor lock-in
+
+- Sync is optional and disabled by default
+- You choose the server URL, credentials, and sync policy
+- The same app build works with different self-hosted servers by changing only settings
+- No FreeCast-owned server or domain is required
 
 ## Support
 

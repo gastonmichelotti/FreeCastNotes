@@ -126,6 +126,7 @@ struct SyncServerStateResponse: Codable {
 
 enum SyncAPIClientError: LocalizedError {
     case invalidURL
+    case insecureHTTPNotAllowed
     case missingToken
     case httpStatus(Int, String)
     case invalidResponse
@@ -134,6 +135,8 @@ enum SyncAPIClientError: LocalizedError {
         switch self {
         case .invalidURL:
             return "Invalid server URL"
+        case .insecureHTTPNotAllowed:
+            return "HTTP is only allowed for localhost during development. Use HTTPS for remote servers."
         case .missingToken:
             return "Missing sync API token"
         case let .httpStatus(code, body):
@@ -203,6 +206,13 @@ final class SyncAPIClient {
         let normalized = trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
         guard let url = URL(string: normalized), let scheme = url.scheme, ["http", "https"].contains(scheme.lowercased()) else {
             throw SyncAPIClientError.invalidURL
+        }
+        if scheme.lowercased() == "http" {
+            let host = (url.host ?? "").lowercased()
+            let isLocalhost = host == "localhost" || host == "127.0.0.1" || host == "::1"
+            if !isLocalhost {
+                throw SyncAPIClientError.insecureHTTPNotAllowed
+            }
         }
         return url
     }

@@ -83,11 +83,13 @@ actor SyncEngine {
 
         return [
             "enabled": settings.enabled,
-            "configured": !settings.serverURL.isEmpty && !settings.workspaceId.isEmpty && hasToken,
+            "configured": hasMinimumConfig(settings: settings, hasToken: hasToken),
+            "baseUrl": settings.serverURL,
             "isRunning": isRunning,
             "mode": settings.mode.rawValue,
+            "intervalSec": settings.intervalSeconds,
             "intervalSeconds": settings.intervalSeconds,
-            "direction": settings.direction.rawValue,
+            "direction": settings.direction.bridgeValue,
             "conflictPolicy": settings.conflictPolicy.rawValue,
             "lastSyncAtMs": json(snapshot.lastSyncAtMs),
             "lastError": json(snapshot.lastError),
@@ -454,8 +456,19 @@ actor SyncEngine {
 
             let currentSettings = settingsStore.load()
             if !currentSettings.enabled || currentSettings.mode != .auto { continue }
+            let hasToken = settingsStore.loadToken()?.isEmpty == false
+            if !hasMinimumConfig(settings: currentSettings, hasToken: hasToken) {
+                continue
+            }
             _ = await runNow()
         }
         autoSyncTask = nil
+    }
+
+    private func hasMinimumConfig(settings: SyncSettings, hasToken: Bool? = nil) -> Bool {
+        let tokenPresent = hasToken ?? (settingsStore.loadToken()?.isEmpty == false)
+        return !settings.serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !settings.workspaceId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            tokenPresent
     }
 }

@@ -10,6 +10,23 @@ enum SyncDirection: String, Codable {
     case uploadOnly = "upload_only"
     case downloadOnly = "download_only"
     case bidirectional
+
+    var bridgeValue: String {
+        switch self {
+        case .uploadOnly: return "upload"
+        case .downloadOnly: return "download"
+        case .bidirectional: return "bidirectional"
+        }
+    }
+
+    static func fromBridgeValue(_ value: String) -> SyncDirection? {
+        switch value {
+        case "upload", "upload_only": return .uploadOnly
+        case "download", "download_only": return .downloadOnly
+        case "bidirectional": return .bidirectional
+        default: return nil
+        }
+    }
 }
 
 enum SyncConflictPolicy: String, Codable {
@@ -144,13 +161,15 @@ final class SyncSettingsStore {
         let hasToken = (loadToken()?.isEmpty == false)
         return [
             "enabled": settings.enabled,
+            "baseUrl": settings.serverURL,
             "serverURL": settings.serverURL,
             "workspaceId": settings.workspaceId,
             "deviceName": settings.deviceName,
             "deviceId": settings.deviceId,
             "mode": settings.mode.rawValue,
+            "intervalSec": settings.intervalSeconds,
             "intervalSeconds": settings.intervalSeconds,
-            "direction": settings.direction.rawValue,
+            "direction": settings.direction.bridgeValue,
             "conflictPolicy": settings.conflictPolicy.rawValue,
             "hasToken": hasToken,
             "apiTokenMasked": hasToken ? "••••••••" : "",
@@ -162,19 +181,25 @@ final class SyncSettingsStore {
 
         if let enabled = payload["enabled"] as? Bool { settings.enabled = enabled }
         if let serverURL = payload["serverURL"] as? String { settings.serverURL = serverURL.trimmingCharacters(in: .whitespacesAndNewlines) }
+        if let baseUrl = payload["baseUrl"] as? String { settings.serverURL = baseUrl.trimmingCharacters(in: .whitespacesAndNewlines) }
         if let workspaceId = payload["workspaceId"] as? String { settings.workspaceId = workspaceId.trimmingCharacters(in: .whitespacesAndNewlines) }
         if let deviceName = payload["deviceName"] as? String { settings.deviceName = deviceName.trimmingCharacters(in: .whitespacesAndNewlines) }
         if let deviceId = payload["deviceId"] as? String, !deviceId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             settings.deviceId = deviceId.trimmingCharacters(in: .whitespacesAndNewlines)
         }
         if let mode = payload["mode"] as? String, let parsed = SyncMode(rawValue: mode) { settings.mode = parsed }
-        if let interval = payload["intervalSeconds"] as? Int {
+        if let interval = payload["intervalSec"] as? Int {
+            settings.intervalSeconds = [30, 60, 300].contains(interval) ? interval : settings.intervalSeconds
+        } else if let intervalNum = payload["intervalSec"] as? NSNumber {
+            let interval = intervalNum.intValue
+            settings.intervalSeconds = [30, 60, 300].contains(interval) ? interval : settings.intervalSeconds
+        } else if let interval = payload["intervalSeconds"] as? Int {
             settings.intervalSeconds = [30, 60, 300].contains(interval) ? interval : settings.intervalSeconds
         } else if let intervalNum = payload["intervalSeconds"] as? NSNumber {
             let interval = intervalNum.intValue
             settings.intervalSeconds = [30, 60, 300].contains(interval) ? interval : settings.intervalSeconds
         }
-        if let direction = payload["direction"] as? String, let parsed = SyncDirection(rawValue: direction) {
+        if let direction = payload["direction"] as? String, let parsed = SyncDirection.fromBridgeValue(direction) {
             settings.direction = parsed
         }
         if let policy = payload["conflictPolicy"] as? String, let parsed = SyncConflictPolicy(rawValue: policy) {
