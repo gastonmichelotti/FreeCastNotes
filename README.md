@@ -184,7 +184,7 @@ VPS (freecast-sync-hub)
   ├─ Fastify API + Bearer auth (+ optional HMAC)
   ├─ SQLite state/changelog/conflicts
   └─ Workspace files on disk
-     /home/opc/documents/freecast-sync/workspaces/<workspaceId>/...
+     <SYNC_DATA_ROOT>/workspaces/<workspaceId>/...
 ```
 
 ### How to self-host sync server
@@ -198,7 +198,7 @@ npm install
 
 # Example (Linux / VPS)
 export SYNC_TOKEN='replace-with-strong-random-token'
-export SYNC_DATA_ROOT='/home/opc/documents/freecast-sync'
+export SYNC_DATA_ROOT='/var/lib/freecast-sync'
 npm start
 ```
 

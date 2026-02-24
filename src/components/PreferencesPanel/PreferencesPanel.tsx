@@ -101,6 +101,7 @@ export default function PreferencesPanel({
   const [syncLogsOpen, setSyncLogsOpen] = useState(false);
   const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>([]);
   const [savedSyncSettings, setSavedSyncSettings] = useState<SyncSettingsDraft>(DEFAULT_SYNC_SETTINGS);
+  const [syncSectionOpen, setSyncSectionOpen] = useState(false);
 
   const refreshSyncState = async () => {
     try {
@@ -262,6 +263,7 @@ export default function PreferencesPanel({
     setRecording(false);
     setSaving(false);
     setError(null);
+    setSyncSectionOpen(false);
     bridge.vaultGetFolder().then(setVaultFolder).catch(() => {});
     bridge.getLaunchAtLogin().then(setLaunchAtLogin).catch(() => {});
     void refreshSyncState();
@@ -527,8 +529,17 @@ export default function PreferencesPanel({
 
           {/* Sync section */}
           <div className="space-y-3 px-4 py-4">
-            <div className="flex items-center justify-between gap-2">
-              <div>
+            <button
+              type="button"
+              onClick={() => setSyncSectionOpen((v) => !v)}
+              aria-expanded={syncSectionOpen}
+              className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                syncSectionOpen
+                  ? "border-white/20 bg-white/8"
+                  : "border-white/10 bg-white/5 hover:bg-white/8"
+              }`}
+            >
+              <div className="min-w-0">
                 <p className="text-[11px] uppercase tracking-wide text-[#E5E5E7]/40">
                   Sync (Beta)
                 </p>
@@ -536,261 +547,314 @@ export default function PreferencesPanel({
                   Optional secure sync with a remote workspace hub.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setSyncSettings((s) => ({ ...s, enabled: !s.enabled }))}
-                className={`shrink-0 rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
-                  syncSettings.enabled
-                    ? "bg-[#FF5F5A]/22 text-[#E5E5E7]"
-                    : "bg-white/10 text-[#E5E5E7]/70 hover:bg-white/15"
-                }`}
-              >
-                {syncSettings.enabled ? "On" : "Off"}
-              </button>
-            </div>
-
-            <div className="rounded-lg border border-amber-200/20 bg-amber-300/8 px-3 py-2">
-              <p className="text-[11px] text-amber-100/85">
-                Sync sends your notes and attachments to the configured server. Only use a server you trust.
-              </p>
-            </div>
-
-            <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-[#E5E5E7]/80">Status</span>
-                <div className="flex items-center gap-2">
-                  <span className={`h-2.5 w-2.5 rounded-full ${syncHealthDotClass}`} />
-                  <span className="text-[11px] capitalize text-[#E5E5E7]/65">
-                    {syncStatus.isRunning ? "syncing" : syncStatus.health}
-                  </span>
-                </div>
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-[#E5E5E7]/55">
-                <span>Last sync</span>
-                <span className="text-right text-[#E5E5E7]/80">
-                  {formatTimestamp(syncStatus.lastSyncAtMs)}
+              <div className="flex shrink-0 items-center gap-2">
+                <span className={`h-2.5 w-2.5 rounded-full ${syncHealthDotClass}`} />
+                <span className="hidden rounded-md border border-white/10 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-wide text-[#E5E5E7]/55 sm:inline">
+                  {syncSectionOpen ? "Collapse" : "Expand"}
                 </span>
-                <span>Pending uploads</span>
-                <span className="text-right text-[#E5E5E7]/80">{syncStatus.pendingUploads}</span>
-                <span>Pending downloads</span>
-                <span className="text-right text-[#E5E5E7]/80">{syncStatus.pendingDownloads}</span>
-                <span>Configured</span>
-                <span className="text-right text-[#E5E5E7]/80">{syncStatus.configured ? "Yes" : "No"}</span>
-                <span>Mode</span>
-                <span className="text-right text-[#E5E5E7]/80 capitalize">{syncStatus.mode}</span>
-              </div>
-              {syncStatus.lastError && (
-                <p className="mt-2 truncate text-[11px] text-rose-200" title={syncStatus.lastError}>
-                  {syncStatus.lastError}
-                </p>
-              )}
-              {syncFeedback && (
-                <p className="mt-2 text-[11px] text-[#E5E5E7]/70">{syncFeedback}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
-                Sync Server Base URL
-              </label>
-              <input
-                value={syncSettings.baseUrl}
-                onChange={(e) => setSyncSettings((s) => ({ ...s, baseUrl: e.target.value }))}
-                placeholder="https://sync.example.com"
-                className={`w-full rounded-lg border bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none ${
-                  syncBaseUrlValid ? "border-white/10 focus:border-white/25" : "border-rose-300/40"
-                }`}
-              />
-              {!syncBaseUrlValid && (
-                <p className="text-[11px] text-rose-200">
-                  Use HTTPS for remote servers. HTTP is allowed only for localhost (dev).
-                </p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-2">
-                <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
-                  Workspace ID
-                </label>
-                <input
-                  value={syncSettings.workspaceId}
-                  onChange={(e) => setSyncSettings((s) => ({ ...s, workspaceId: e.target.value }))}
-                  placeholder="gato-main"
-                  className={`w-full rounded-lg border bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none ${
-                    syncWorkspaceIdValid ? "border-white/10 focus:border-white/25" : "border-rose-300/40"
+                <span
+                  className={`flex h-7 w-7 items-center justify-center rounded-md border border-white/14 bg-black/25 text-[#E5E5E7]/80 transition-all ${
+                    syncSectionOpen ? "rotate-180 border-white/22 bg-white/8" : ""
                   }`}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
-                  Device ID
-                </label>
-                <input
-                  value={syncSettings.deviceId}
-                  onChange={(e) => setSyncSettings((s) => ({ ...s, deviceId: e.target.value }))}
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none focus:border-white/25"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
-                Device Name
-              </label>
-                <input
-                  value={syncSettings.deviceName}
-                  onChange={(e) => setSyncSettings((s) => ({ ...s, deviceName: e.target.value }))}
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none focus:border-white/25"
-                />
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
-                API Token
-              </label>
-              <input
-                value={syncTokenInput}
-                onChange={(e) => setSyncTokenInput(e.target.value)}
-                type="password"
-                placeholder={syncSettings.apiTokenMasked || "Set API token"}
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none focus:border-white/25"
-              />
-              <p className="text-[11px] text-[#E5E5E7]/40">
-                {syncSettings.hasToken
-                  ? "Token is stored in Keychain. Enter a new token to replace it, then click Save."
-                  : "No token saved. Enter a token and click Save."}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-2">
-                <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
-                  Mode
-                </label>
-                <select
-                  value={syncSettings.mode}
-                  onChange={(e) => setSyncSettings((s) => ({ ...s, mode: e.target.value as SyncSettingsDraft["mode"] }))}
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none"
+                  aria-hidden="true"
                 >
-                  <option value="manual">Manual</option>
-                  <option value="auto">Auto</option>
-                </select>
+                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3.5 6.5 8 10.5l4.5-4" />
+                  </svg>
+                </span>
               </div>
-              <div className="space-y-2">
-                <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
-                  Auto interval
-                </label>
-                <select
-                  value={String(syncSettings.intervalSec)}
-                  onChange={(e) => setSyncSettings((s) => ({ ...s, intervalSec: Number(e.target.value) as 30 | 60 | 300 }))}
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none"
+            </button>
+
+            {!syncSectionOpen ? (
+              <div className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-xs text-[#E5E5E7]/80">
+                    {syncSettings.enabled ? "Sync enabled" : "Sync disabled"}
+                  </p>
+                  <p className="truncate text-[11px] text-[#E5E5E7]/40">
+                    {syncStatus.configured ? (syncSettings.baseUrl || "Configured") : "Not configured"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSyncSettings((s) => ({ ...s, enabled: !s.enabled }))}
+                  className={`shrink-0 rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                    syncSettings.enabled
+                      ? "bg-[#FF5F5A]/22 text-[#E5E5E7]"
+                      : "bg-white/10 text-[#E5E5E7]/70 hover:bg-white/15"
+                  }`}
                 >
-                  <option value="30">30s</option>
-                  <option value="60">60s</option>
-                  <option value="300">5m</option>
-                </select>
+                  {syncSettings.enabled ? "On" : "Off"}
+                </button>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-[#E5E5E7]/40">
+                      Sync Settings
+                    </p>
+                    <p className="mt-1 text-xs text-[#E5E5E7]/45">
+                      Configure a compatible sync server and policy.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSyncSettings((s) => ({ ...s, enabled: !s.enabled }))}
+                    className={`shrink-0 rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                      syncSettings.enabled
+                        ? "bg-[#FF5F5A]/22 text-[#E5E5E7]"
+                        : "bg-white/10 text-[#E5E5E7]/70 hover:bg-white/15"
+                    }`}
+                  >
+                    {syncSettings.enabled ? "On" : "Off"}
+                  </button>
+                </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-2">
-                <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
-                  Direction
-                </label>
-                <select
-                  value={syncSettings.direction}
-                  onChange={(e) => setSyncSettings((s) => ({ ...s, direction: e.target.value as SyncSettingsDraft["direction"] }))}
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none"
-                >
-                  <option value="upload">Upload only</option>
-                  <option value="download">Download only</option>
-                  <option value="bidirectional">Bidirectional</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
-                  Conflict Policy
-                </label>
-                <select
-                  value={syncSettings.conflictPolicy}
-                  onChange={(e) => setSyncSettings((s) => ({ ...s, conflictPolicy: e.target.value as SyncSettingsDraft["conflictPolicy"] }))}
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none"
-                >
-                  <option value="latest_modified_wins">Latest modified wins</option>
-                </select>
-              </div>
-            </div>
+                <div className="rounded-lg border border-amber-200/20 bg-amber-300/8 px-3 py-2">
+                  <p className="text-[11px] text-amber-100/85">
+                    Sync sends your notes and attachments to the configured server. Only use a server you trust.
+                  </p>
+                </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => void handleSaveSyncSettings()}
-                disabled={syncSaving || !syncDirty}
-                className="rounded-md bg-[#FF5F5A]/18 px-2.5 py-2 text-[11px] text-[#E5E5E7] transition-colors hover:bg-[#FF5F5A]/28 disabled:opacity-50"
-              >
-                {syncSaving ? "Saving…" : "Save"}
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleResetSyncSettings()}
-                disabled={syncSaving || !syncDirty}
-                className="rounded-md border border-white/10 bg-white/5 px-2.5 py-2 text-[11px] text-[#E5E5E7]/80 transition-colors hover:bg-white/8 disabled:opacity-50"
-              >
-                Reset
-              </button>
-            </div>
+                <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-[#E5E5E7]/80">Status</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2.5 w-2.5 rounded-full ${syncHealthDotClass}`} />
+                      <span className="text-[11px] capitalize text-[#E5E5E7]/65">
+                        {syncStatus.isRunning ? "syncing" : syncStatus.health}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-[#E5E5E7]/55">
+                    <span>Last sync</span>
+                    <span className="text-right text-[#E5E5E7]/80">
+                      {formatTimestamp(syncStatus.lastSyncAtMs)}
+                    </span>
+                    <span>Pending uploads</span>
+                    <span className="text-right text-[#E5E5E7]/80">{syncStatus.pendingUploads}</span>
+                    <span>Pending downloads</span>
+                    <span className="text-right text-[#E5E5E7]/80">{syncStatus.pendingDownloads}</span>
+                    <span>Configured</span>
+                    <span className="text-right text-[#E5E5E7]/80">{syncStatus.configured ? "Yes" : "No"}</span>
+                    <span>Mode</span>
+                    <span className="text-right text-[#E5E5E7]/80 capitalize">{syncStatus.mode}</span>
+                  </div>
+                  {syncStatus.lastError && (
+                    <p className="mt-2 truncate text-[11px] text-rose-200" title={syncStatus.lastError}>
+                      {syncStatus.lastError}
+                    </p>
+                  )}
+                  {syncFeedback && (
+                    <p className="mt-2 text-[11px] text-[#E5E5E7]/70">{syncFeedback}</p>
+                  )}
+                </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => void handleSyncTestConnection()}
-                disabled={syncActionBusy !== null || !syncBaseUrlValid || !syncSettings.baseUrl.trim()}
-                className="rounded-md border border-white/10 bg-white/5 px-2.5 py-2 text-[11px] text-[#E5E5E7]/80 transition-colors hover:bg-white/8 disabled:opacity-50"
-              >
-                {syncActionBusy === "test" ? "Testing…" : "Test Connection"}
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleSyncRunNow()}
-                disabled={syncActionBusy !== null || !syncCanRunActions}
-                className="rounded-md bg-[#FF5F5A]/18 px-2.5 py-2 text-[11px] text-[#E5E5E7] transition-colors hover:bg-[#FF5F5A]/28 disabled:opacity-50"
-              >
-                {syncActionBusy === "sync" ? "Syncing…" : "Sync Now"}
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleSyncLogsToggle()}
-                disabled={syncActionBusy === "logs"}
-                className="rounded-md border border-white/10 bg-white/5 px-2.5 py-2 text-[11px] text-[#E5E5E7]/80 transition-colors hover:bg-white/8 disabled:opacity-50"
-              >
-                {syncLogsOpen ? "Hide Sync Logs" : "Open Sync Logs"}
-              </button>
-            </div>
+                <div className="space-y-2">
+                  <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
+                    Sync Server Base URL
+                  </label>
+                  <input
+                    value={syncSettings.baseUrl}
+                    onChange={(e) => setSyncSettings((s) => ({ ...s, baseUrl: e.target.value }))}
+                    placeholder="https://sync.example.com"
+                    className={`w-full rounded-lg border bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none ${
+                      syncBaseUrlValid ? "border-white/10 focus:border-white/25" : "border-rose-300/40"
+                    }`}
+                  />
+                  {!syncBaseUrlValid && (
+                    <p className="text-[11px] text-rose-200">
+                      Use HTTPS for remote servers. HTTP is allowed only for localhost (dev).
+                    </p>
+                  )}
+                </div>
 
-            {syncLogsOpen && (
-              <div className="max-h-32 overflow-y-auto rounded-lg border border-white/10 bg-black/20 p-2">
-                {syncLogs.length === 0 ? (
-                  <p className="text-[11px] text-[#E5E5E7]/45">No sync logs yet.</p>
-                ) : (
-                  <div className="space-y-1">
-                    {syncLogs.slice(0, 15).map((entry, idx) => (
-                      <div key={`${entry.tsMs}-${idx}`} className="rounded border border-white/6 bg-white/3 px-2 py-1">
-                        <p className="text-[10px] text-[#E5E5E7]/45">{formatTimestamp(entry.tsMs)}</p>
-                        <p className="truncate text-[11px] text-[#E5E5E7]/75" title={entry.message}>
-                          {entry.message}
-                        </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
+                      Workspace ID
+                    </label>
+                    <input
+                      value={syncSettings.workspaceId}
+                      onChange={(e) => setSyncSettings((s) => ({ ...s, workspaceId: e.target.value }))}
+                      placeholder="gato-main"
+                      className={`w-full rounded-lg border bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none ${
+                        syncWorkspaceIdValid ? "border-white/10 focus:border-white/25" : "border-rose-300/40"
+                      }`}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
+                      Device ID
+                    </label>
+                    <input
+                      value={syncSettings.deviceId}
+                      onChange={(e) => setSyncSettings((s) => ({ ...s, deviceId: e.target.value }))}
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none focus:border-white/25"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
+                    Device Name
+                  </label>
+                  <input
+                    value={syncSettings.deviceName}
+                    onChange={(e) => setSyncSettings((s) => ({ ...s, deviceName: e.target.value }))}
+                    className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none focus:border-white/25"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
+                    API Token
+                  </label>
+                  <input
+                    value={syncTokenInput}
+                    onChange={(e) => setSyncTokenInput(e.target.value)}
+                    type="password"
+                    placeholder={syncSettings.apiTokenMasked || "Set API token"}
+                    className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none focus:border-white/25"
+                  />
+                  <p className="text-[11px] text-[#E5E5E7]/40">
+                    {syncSettings.hasToken
+                      ? "Token is stored in Keychain. Enter a new token to replace it, then click Save."
+                      : "No token saved. Enter a token and click Save."}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
+                      Mode
+                    </label>
+                    <select
+                      value={syncSettings.mode}
+                      onChange={(e) => setSyncSettings((s) => ({ ...s, mode: e.target.value as SyncSettingsDraft["mode"] }))}
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none"
+                    >
+                      <option value="manual">Manual</option>
+                      <option value="auto">Auto</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
+                      Auto interval
+                    </label>
+                    <select
+                      value={String(syncSettings.intervalSec)}
+                      onChange={(e) => setSyncSettings((s) => ({ ...s, intervalSec: Number(e.target.value) as 30 | 60 | 300 }))}
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none"
+                    >
+                      <option value="30">30s</option>
+                      <option value="60">60s</option>
+                      <option value="300">5m</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
+                      Direction
+                    </label>
+                    <select
+                      value={syncSettings.direction}
+                      onChange={(e) => setSyncSettings((s) => ({ ...s, direction: e.target.value as SyncSettingsDraft["direction"] }))}
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none"
+                    >
+                      <option value="upload">Upload only</option>
+                      <option value="download">Download only</option>
+                      <option value="bidirectional">Bidirectional</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-[11px] uppercase tracking-wide text-[#E5E5E7]/35">
+                      Conflict Policy
+                    </label>
+                    <select
+                      value={syncSettings.conflictPolicy}
+                      onChange={(e) => setSyncSettings((s) => ({ ...s, conflictPolicy: e.target.value as SyncSettingsDraft["conflictPolicy"] }))}
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#E5E5E7] outline-none"
+                    >
+                      <option value="latest_modified_wins">Latest modified wins</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveSyncSettings()}
+                    disabled={syncSaving || !syncDirty}
+                    className="rounded-md bg-[#FF5F5A]/18 px-2.5 py-2 text-[11px] text-[#E5E5E7] transition-colors hover:bg-[#FF5F5A]/28 disabled:opacity-50"
+                  >
+                    {syncSaving ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleResetSyncSettings()}
+                    disabled={syncSaving || !syncDirty}
+                    className="rounded-md border border-white/10 bg-white/5 px-2.5 py-2 text-[11px] text-[#E5E5E7]/80 transition-colors hover:bg-white/8 disabled:opacity-50"
+                  >
+                    Reset
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleSyncTestConnection()}
+                    disabled={syncActionBusy !== null || !syncBaseUrlValid || !syncSettings.baseUrl.trim()}
+                    className="rounded-md border border-white/10 bg-white/5 px-2.5 py-2 text-[11px] text-[#E5E5E7]/80 transition-colors hover:bg-white/8 disabled:opacity-50"
+                  >
+                    {syncActionBusy === "test" ? "Testing…" : "Test Connection"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSyncRunNow()}
+                    disabled={syncActionBusy !== null || !syncCanRunActions}
+                    className="rounded-md bg-[#FF5F5A]/18 px-2.5 py-2 text-[11px] text-[#E5E5E7] transition-colors hover:bg-[#FF5F5A]/28 disabled:opacity-50"
+                  >
+                    {syncActionBusy === "sync" ? "Syncing…" : "Sync Now"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSyncLogsToggle()}
+                    disabled={syncActionBusy === "logs"}
+                    className="rounded-md border border-white/10 bg-white/5 px-2.5 py-2 text-[11px] text-[#E5E5E7]/80 transition-colors hover:bg-white/8 disabled:opacity-50"
+                  >
+                    {syncLogsOpen ? "Hide Sync Logs" : "Open Sync Logs"}
+                  </button>
+                </div>
+
+                {syncLogsOpen && (
+                  <div className="max-h-32 overflow-y-auto rounded-lg border border-white/10 bg-black/20 p-2">
+                    {syncLogs.length === 0 ? (
+                      <p className="text-[11px] text-[#E5E5E7]/45">No sync logs yet.</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {syncLogs.slice(0, 15).map((entry, idx) => (
+                          <div key={`${entry.tsMs}-${idx}`} className="rounded border border-white/6 bg-white/3 px-2 py-1">
+                            <p className="text-[10px] text-[#E5E5E7]/45">{formatTimestamp(entry.tsMs)}</p>
+                            <p className="truncate text-[11px] text-[#E5E5E7]/75" title={entry.message}>
+                              {entry.message}
+                            </p>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
                 )}
-              </div>
-            )}
 
-            {(syncLoading || syncSaving) && (
-              <p className="text-[11px] text-[#E5E5E7]/45">
-                {syncLoading ? "Loading sync settings…" : "Saving sync settings…"}
-              </p>
+                {(syncLoading || syncSaving) && (
+                  <p className="text-[11px] text-[#E5E5E7]/45">
+                    {syncLoading ? "Loading sync settings…" : "Saving sync settings…"}
+                  </p>
+                )}
+              </>
             )}
           </div>
 

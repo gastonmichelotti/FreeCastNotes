@@ -19,10 +19,39 @@ npm install
 SYNC_TOKEN=dev-token npm start
 ```
 
-Server data is stored under `SYNC_DATA_ROOT` (default: `/home/opc/documents/freecast-sync`):
+Server data is stored under `SYNC_DATA_ROOT` (default: `./data`, resolved relative to `sync-hub/`).
 
 - `state.sqlite`
 - `workspaces/<workspaceId>/...`
+
+Layout:
+
+- `<SYNC_DATA_ROOT>/state.sqlite`
+- `<SYNC_DATA_ROOT>/workspaces/<workspaceId>/...`
+
+## Data root configuration
+
+`SYNC_DATA_ROOT` is infrastructure configuration (where the hub stores sync state/files), not app business logic.
+
+- Relative path (recommended for dev): `SYNC_DATA_ROOT=./data`
+  - Resolved relative to the `sync-hub/` folder
+- Absolute path (recommended for prod): `SYNC_DATA_ROOT=/var/lib/freecast-sync`
+
+### Dev local example
+
+```env
+SYNC_PORT=8787
+SYNC_TOKEN=change-me
+SYNC_DATA_ROOT=./data
+```
+
+### Production example (VPS / Docker volume)
+
+```env
+SYNC_PORT=8787
+SYNC_TOKEN=change-me
+SYNC_DATA_ROOT=/var/lib/freecast-sync
+```
 
 ## Security (MVP)
 
