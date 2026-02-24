@@ -46,7 +46,18 @@ test('sync hub MVP flow', async (t) => {
   assert.equal(unauthorized.statusCode, 401);
 
   const notePath = 'projects/freecast-landing/brief.md';
-  const noteBody = Buffer.from('# hola\n');
+  const noteBody = Buffer.from(
+    [
+      '---',
+      'id: 11111111-1111-4111-8111-111111111111',
+      'created_at: 2026-02-24T00:00:00.000Z',
+      'updated_at: 2026-02-24T00:00:00.000Z',
+      '---',
+      '',
+      '# hola',
+      '',
+    ].join('\n'),
+  );
   const noteHash = sha256Hex(noteBody);
   const mtime = Date.now();
 
@@ -136,4 +147,29 @@ test('sync hub MVP flow', async (t) => {
   });
   assert.equal(traversal.statusCode, 200);
   assert.equal(traversal.json().rejected.length, 1);
+
+  const invalidMdBody = Buffer.from('hello without frontmatter\\n');
+  const invalidMdHash = sha256Hex(invalidMdBody);
+  const invalidFrontmatterPush = await app.inject({
+    method: 'POST',
+    url: '/sync/push',
+    headers: authHeaders(),
+    payload: {
+      workspaceId: 'gato-main',
+      deviceId: 'macbook-gato-001',
+      files: [{
+        path: 'projects/shared/no-frontmatter.md',
+        sha256: invalidMdHash,
+        size: invalidMdBody.length,
+        mtimeMs: mtime + 2,
+        encoding: 'base64',
+        contentBase64: invalidMdBody.toString('base64'),
+      }],
+      deletes: [],
+    },
+  });
+  assert.equal(invalidFrontmatterPush.statusCode, 200);
+  assert.equal(invalidFrontmatterPush.json().applied.length, 0);
+  assert.equal(invalidFrontmatterPush.json().rejected.length, 1);
+  assert.equal(invalidFrontmatterPush.json().rejected[0].reason, 'invalid_note_frontmatter');
 });

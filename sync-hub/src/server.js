@@ -8,6 +8,7 @@ import { getConfig } from './config.js';
 import { SyncStore } from './db.js';
 import { normalizeRelativePath, normalizeWorkspaceId, resolveWorkspaceFilePath } from './path-utils.js';
 import { authPreHandler } from './auth.js';
+import { validateNoteFrontmatter } from './note-frontmatter.js';
 
 const DIRECTIONS = ['upload_only', 'download_only', 'bidirectional'];
 const CONFLICT_POLICIES = ['latest_modified_wins'];
@@ -297,6 +298,18 @@ export async function buildServer(options = {}) {
           }
           if (buf.length !== incoming.size) {
             throw new Error('size mismatch');
+          }
+          if (relPath.endsWith('.md')) {
+            let text;
+            try {
+              text = new TextDecoder('utf-8', { fatal: true }).decode(buf);
+            } catch {
+              throw new Error('invalid_note_frontmatter');
+            }
+            const validation = validateNoteFrontmatter(text);
+            if (!validation.ok) {
+              throw new Error('invalid_note_frontmatter');
+            }
           }
 
           const existing = app.syncStore.getFile(workspaceId, relPath);

@@ -82,3 +82,18 @@ SYNC_DATA_ROOT=/var/lib/freecast-sync
 cd sync-hub
 npm test
 ```
+
+## Repair legacy notes (one-shot)
+
+Normalize existing `*.md` files to ensure required frontmatter (`id`, `created_at`, `updated_at`) before enabling sync on older workspaces.
+
+```bash
+cd sync-hub
+npm run repair-frontmatter -- --root ./data/workspaces/<workspaceId>
+```
+
+Notes:
+
+- Creates `*.bak` backups by default
+- Skips `_deleted/`
+- Use `--no-backup` to modify in place without backups

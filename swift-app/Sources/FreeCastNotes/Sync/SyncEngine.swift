@@ -343,10 +343,21 @@ actor SyncEngine {
             }
             guard shouldSync(path: relPath) else { continue }
 
-            let data = try Data(contentsOf: url)
+            let data: Data
+            if relPath.hasSuffix(".md"), let original = try? String(contentsOf: url, encoding: .utf8) {
+                let normalized = NoteFrontmatterNormalizer.ensure(content: original)
+                if normalized.changed {
+                    try normalized.content.write(to: url, atomically: true, encoding: .utf8)
+                }
+                data = Data(normalized.content.utf8)
+            } else {
+                data = try Data(contentsOf: url)
+            }
+
             let hash = FileHasher.sha256Hex(data: data)
-            let mtime = Int64((values?.contentModificationDate ?? Date()).timeIntervalSince1970 * 1000)
-            let size = values?.fileSize ?? data.count
+            let postValues = try? url.resourceValues(forKeys: resourceKeys)
+            let mtime = Int64((postValues?.contentModificationDate ?? values?.contentModificationDate ?? Date()).timeIntervalSince1970 * 1000)
+            let size = postValues?.fileSize ?? values?.fileSize ?? data.count
             files[relPath] = LocalSyncFile(path: relPath, url: url, sha256: hash, size: size, mtimeMs: mtime)
         }
         return files
