@@ -12,6 +12,21 @@ Fastify + SQLite sync API for FreeCastNotes remote workspace sync.
 
 ## Run locally
 
+### Option A: from repo root (recommended in dev)
+
+```bash
+make sync-hub-start
+make sync-hub-logs
+make sync-hub-stop
+```
+
+This uses:
+
+- PID file: `sync-hub/.run/sync-hub.pid`
+- Log file: `sync-hub/.run/sync-hub.log`
+
+### Option B: manual start (inside `sync-hub/`)
+
 ```bash
 cd sync-hub
 cp .env.example .env

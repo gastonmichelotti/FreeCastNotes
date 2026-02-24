@@ -191,6 +191,16 @@ VPS (freecast-sync-hub)
 
 The sync hub is included in this repo under `sync-hub/`.
 
+For local development from the repo root, you can manage it with Make:
+
+```bash
+make sync-hub-start
+make sync-hub-logs
+make sync-hub-stop
+```
+
+Manual startup (useful for VPS / direct shell):
+
 ```bash
 cd sync-hub
 cp .env.example .env
