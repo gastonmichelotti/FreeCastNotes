@@ -45,6 +45,7 @@ type SyncStatus = {
 };
 
 type SyncLogEntry = { tsMs: number; message: string };
+type SyncFeedbackTone = "info" | "success" | "error";
 
 const DEFAULT_SYNC_SETTINGS: SyncSettingsDraft = {
   enabled: false,
@@ -97,6 +98,7 @@ export default function PreferencesPanel({
   const [syncSaving, setSyncSaving] = useState(false);
   const [syncActionBusy, setSyncActionBusy] = useState<null | "test" | "sync" | "logs">(null);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
+  const [syncFeedbackTone, setSyncFeedbackTone] = useState<SyncFeedbackTone>("info");
   const [syncTokenInput, setSyncTokenInput] = useState("");
   const [syncLogsOpen, setSyncLogsOpen] = useState(false);
   const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>([]);
@@ -116,8 +118,10 @@ export default function PreferencesPanel({
       setSyncStatus(parseSyncStatus(rawStatus));
       setSyncTokenInput("");
       setSyncFeedback(null);
+      setSyncFeedbackTone("info");
     } catch {
       setSyncFeedback("Could not load sync settings/status.");
+      setSyncFeedbackTone("error");
     } finally {
       setSyncLoading(false);
     }
@@ -129,23 +133,28 @@ export default function PreferencesPanel({
     const requiresCompleteConfig = next.enabled || next.baseUrl.trim().length > 0;
     if (next.baseUrl && !isAllowedSyncBaseUrl(next.baseUrl)) {
       setSyncFeedback("Use HTTPS for remote servers. HTTP is only allowed for localhost.");
+      setSyncFeedbackTone("error");
       return;
     }
     if (requiresCompleteConfig && next.baseUrl.trim().length === 0) {
       setSyncFeedback("Sync Server Base URL is required when sync is enabled.");
+      setSyncFeedbackTone("error");
       return;
     }
     if (requiresCompleteConfig && next.workspaceId.trim().length === 0) {
       setSyncFeedback("Workspace ID is required.");
+      setSyncFeedbackTone("error");
       return;
     }
     if (token.length > 0 && token.length < 8) {
       setSyncFeedback("API token must be at least 8 characters.");
+      setSyncFeedbackTone("error");
       return;
     }
 
     setSyncSaving(true);
     setSyncFeedback(null);
+    setSyncFeedbackTone("info");
     try {
       const payload: Record<string, unknown> = {
         enabled: next.enabled,
@@ -165,6 +174,7 @@ export default function PreferencesPanel({
       if (!ok) {
         const message = getString((result as Record<string, unknown>).error) ?? "Failed to save sync settings";
         setSyncFeedback(message);
+        setSyncFeedbackTone("error");
       } else {
         const saved = (result as Record<string, unknown>).settings;
         if (saved && typeof saved === "object") {
@@ -174,11 +184,13 @@ export default function PreferencesPanel({
         }
         if (syncTokenInput.length > 0) setSyncTokenInput("");
         setSyncFeedback("Sync settings saved");
+        setSyncFeedbackTone("success");
         const statusRaw = await bridge.syncGetStatus();
         setSyncStatus(parseSyncStatus(statusRaw));
       }
     } catch (e) {
       setSyncFeedback(e instanceof Error ? e.message : "Failed to save sync settings");
+      setSyncFeedbackTone("error");
     } finally {
       setSyncSaving(false);
     }
@@ -188,6 +200,7 @@ export default function PreferencesPanel({
     setSyncSettings(savedSyncSettings);
     setSyncTokenInput("");
     setSyncFeedback("Sync settings reset");
+    setSyncFeedbackTone("info");
     try {
       const statusRaw = await bridge.syncGetStatus();
       setSyncStatus(parseSyncStatus(statusRaw));
@@ -199,18 +212,22 @@ export default function PreferencesPanel({
   const handleSyncTestConnection = async () => {
     setSyncActionBusy("test");
     setSyncFeedback(null);
+    setSyncFeedbackTone("info");
     try {
       const result = await bridge.syncTestConnection();
       const ok = Boolean((result as { ok?: unknown }).ok);
       if (ok) {
         setSyncFeedback("Connection OK");
+        setSyncFeedbackTone("success");
       } else {
         setSyncFeedback(getString((result as Record<string, unknown>).error) ?? "Connection test failed");
+        setSyncFeedbackTone("error");
       }
       const statusRaw = await bridge.syncGetStatus();
       setSyncStatus(parseSyncStatus(statusRaw));
     } catch (e) {
       setSyncFeedback(e instanceof Error ? e.message : "Connection test failed");
+      setSyncFeedbackTone("error");
     } finally {
       setSyncActionBusy(null);
     }
@@ -219,6 +236,7 @@ export default function PreferencesPanel({
   const handleSyncRunNow = async () => {
     setSyncActionBusy("sync");
     setSyncFeedback(null);
+    setSyncFeedbackTone("info");
     try {
       const result = await bridge.syncRunNow();
       const ok = Boolean((result as { ok?: unknown }).ok);
@@ -227,6 +245,7 @@ export default function PreferencesPanel({
           ? "Sync completed"
           : (getString((result as Record<string, unknown>).error) ?? "Sync failed"),
       );
+      setSyncFeedbackTone(ok ? "success" : "error");
       const statusValue = (result as Record<string, unknown>).status;
       if (statusValue && typeof statusValue === "object") {
         setSyncStatus(parseSyncStatus(statusValue as Record<string, unknown>));
@@ -236,6 +255,7 @@ export default function PreferencesPanel({
       }
     } catch (e) {
       setSyncFeedback(e instanceof Error ? e.message : "Sync failed");
+      setSyncFeedbackTone("error");
     } finally {
       setSyncActionBusy(null);
     }
@@ -251,6 +271,7 @@ export default function PreferencesPanel({
       setSyncLogs(Array.isArray(logsRaw) ? logsRaw.map(parseSyncLog).filter(Boolean) as SyncLogEntry[] : []);
     } catch {
       setSyncFeedback("Could not load sync logs.");
+      setSyncFeedbackTone("error");
     } finally {
       setSyncActionBusy(null);
     }
@@ -647,7 +668,19 @@ export default function PreferencesPanel({
                     </p>
                   )}
                   {syncFeedback && (
-                    <p className="mt-2 text-[11px] text-[#E5E5E7]/70">{syncFeedback}</p>
+                    <p
+                      className={`mt-2 rounded-md border px-2 py-1.5 text-[11px] ${
+                        syncFeedbackTone === "success"
+                          ? "border-emerald-300/25 bg-emerald-300/8 text-emerald-100"
+                          : syncFeedbackTone === "error"
+                            ? "border-rose-300/25 bg-rose-300/8 text-rose-100"
+                            : "border-white/10 bg-white/5 text-[#E5E5E7]/70"
+                      }`}
+                      role={syncFeedbackTone === "error" ? "alert" : "status"}
+                    >
+                      {syncFeedbackTone === "success" ? "Success: " : syncFeedbackTone === "error" ? "Error: " : ""}
+                      {syncFeedback}
+                    </p>
                   )}
                 </div>
 
