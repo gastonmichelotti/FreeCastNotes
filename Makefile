@@ -5,13 +5,18 @@
 # =============================================================================
 
 .PHONY: help dev dev-front dev-swift build build-debug bundle dmg clean clean-front \
-        clean-swift check open install kill release-update release-new
+        clean-swift check open install kill release-update release-new \
+        sync-hub-start sync-hub-logs sync-hub-stop
 
 C := \033[36m
 G := \033[32m
 Y := \033[33m
 R := \033[31m
 N := \033[0m
+SYNC_HUB_DIR := sync-hub
+SYNC_HUB_RUN_DIR := $(SYNC_HUB_DIR)/.run
+SYNC_HUB_PID_FILE := $(SYNC_HUB_RUN_DIR)/sync-hub.pid
+SYNC_HUB_LOG_FILE := $(SYNC_HUB_RUN_DIR)/sync-hub.log
 
 .DEFAULT_GOAL := help
 
@@ -32,6 +37,11 @@ help:
 	@echo ""
 	@echo "$(G)Verificación:$(N)"
 	@echo "  check         Type-check del frontend (tsc)"
+	@echo ""
+	@echo "$(G)Sync Hub (dev local):$(N)"
+	@echo "  sync-hub-start   Levanta sync-hub en background y guarda logs"
+	@echo "  sync-hub-logs    Muestra logs del sync-hub (tail -f)"
+	@echo "  sync-hub-stop    Detiene sync-hub en background"
 	@echo ""
 	@echo "$(G)Mantenimiento:$(N)"
 	@echo "  install       Instala dependencias (npm + Swift packages)"
@@ -95,6 +105,89 @@ check:
 	@echo "$(C)Type-checking frontend...$(N)"
 	@npx tsc --noEmit
 	@echo "$(G)OK$(N)"
+
+# === SYNC HUB (DEV LOCAL) ===
+
+sync-hub-start:
+	@mkdir -p $(SYNC_HUB_RUN_DIR)
+	@if [ ! -d "$(SYNC_HUB_DIR)/node_modules" ]; then \
+		echo "$(R)sync-hub no tiene dependencias instaladas.$(N)"; \
+		echo "$(Y)Ejecutá: cd sync-hub && npm install$(N)"; \
+		exit 1; \
+	fi
+	@if [ -f "$(SYNC_HUB_PID_FILE)" ]; then \
+		PID=$$(cat "$(SYNC_HUB_PID_FILE)"); \
+		if kill -0 $$PID 2>/dev/null; then \
+			echo "$(Y)sync-hub ya está corriendo (PID $$PID).$(N)"; \
+			echo "$(C)Logs: $(SYNC_HUB_LOG_FILE)$(N)"; \
+			exit 0; \
+		else \
+			rm -f "$(SYNC_HUB_PID_FILE)"; \
+		fi; \
+	fi
+	@EXISTING_PID=$$(pgrep -f "sync-hub/src/index.js" | head -1); \
+	if [ -z "$$EXISTING_PID" ]; then \
+		PORT=$$(awk -F= '/^SYNC_PORT=/{print $$2}' $(SYNC_HUB_DIR)/.env 2>/dev/null | tail -1); \
+		[ -z "$$PORT" ] && PORT=8787; \
+		EXISTING_PID=$$(lsof -ti:$$PORT 2>/dev/null | head -1); \
+	fi; \
+	if [ -n "$$EXISTING_PID" ]; then \
+		echo "$(Y)sync-hub ya está corriendo (PID $$EXISTING_PID) sin PID file.$(N)"; \
+		echo $$EXISTING_PID > "$(SYNC_HUB_PID_FILE)"; \
+		echo "$(C)Logs: $(SYNC_HUB_LOG_FILE)$(N)"; \
+		exit 0; \
+	fi
+	@echo "$(G)Levantando sync-hub en background...$(N)"
+	@(cd $(SYNC_HUB_DIR) && \
+		set -a; [ -f .env ] && . ./.env || true; set +a; \
+		( nohup npm start > .run/sync-hub.log 2>&1 & echo $$! > .run/sync-hub.pid ))
+	@sleep 1
+	@PID=$$(cat "$(SYNC_HUB_PID_FILE)"); \
+	if kill -0 $$PID 2>/dev/null; then \
+		echo "$(G)sync-hub corriendo (PID $$PID).$(N)"; \
+		echo "$(C)Logs: $(SYNC_HUB_LOG_FILE)$(N)"; \
+	else \
+		echo "$(R)sync-hub no pudo iniciar. Revisá logs: $(SYNC_HUB_LOG_FILE)$(N)"; \
+		exit 1; \
+	fi
+
+sync-hub-logs:
+	@mkdir -p $(SYNC_HUB_RUN_DIR)
+	@if [ ! -f "$(SYNC_HUB_LOG_FILE)" ]; then \
+		echo "$(Y)No hay log todavía. Ejecutá 'make sync-hub-start' primero.$(N)"; \
+		exit 1; \
+	fi
+	@echo "$(C)Mostrando logs de sync-hub ($(SYNC_HUB_LOG_FILE))... Ctrl+C para salir.$(N)"
+	@tail -f "$(SYNC_HUB_LOG_FILE)"
+
+sync-hub-stop:
+	@{ \
+		PORT=$$(awk -F= '/^SYNC_PORT=/{print $$2}' $(SYNC_HUB_DIR)/.env 2>/dev/null | tail -1); \
+		[ -z "$$PORT" ] && PORT=8787; \
+		if [ ! -f "$(SYNC_HUB_PID_FILE)" ]; then \
+			echo "$(Y)No hay PID file. Intentando detener por patrón...$(N)"; \
+			pkill -f "sync-hub/src/index.js" 2>/dev/null || true; \
+			PID_BY_PORT=$$(lsof -ti:$$PORT 2>/dev/null | head -1); \
+			[ -n "$$PID_BY_PORT" ] && kill $$PID_BY_PORT 2>/dev/null || true; \
+			echo "$(G)Listo.$(N)"; \
+		else \
+			PID=$$(cat "$(SYNC_HUB_PID_FILE)"); \
+			if kill -0 $$PID 2>/dev/null; then \
+				echo "$(Y)Deteniendo sync-hub (PID $$PID)...$(N)"; \
+				kill $$PID; \
+				sleep 1; \
+				if kill -0 $$PID 2>/dev/null; then kill -9 $$PID 2>/dev/null || true; fi; \
+				echo "$(G)sync-hub detenido.$(N)"; \
+			else \
+				echo "$(Y)PID $$PID no está corriendo.$(N)"; \
+				echo "$(Y)Intentando detener por patrón...$(N)"; \
+				pkill -f "sync-hub/src/index.js" 2>/dev/null || true; \
+				PID_BY_PORT=$$(lsof -ti:$$PORT 2>/dev/null | head -1); \
+				[ -n "$$PID_BY_PORT" ] && kill $$PID_BY_PORT 2>/dev/null || true; \
+			fi; \
+			rm -f "$(SYNC_HUB_PID_FILE)"; \
+		fi; \
+	}
 
 # === MANTENIMIENTO ===
 

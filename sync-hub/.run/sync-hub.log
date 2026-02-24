@@ -1,0 +1,8 @@
+
+> freecast-sync-hub@0.1.0 start
+> node src/index.js
+
+{"level":30,"time":1771906042789,"pid":99703,"hostname":"MacBook-Pro-3.local","msg":"Server listening at http://127.0.0.1:8787"}
+{"level":30,"time":1771906042790,"pid":99703,"hostname":"MacBook-Pro-3.local","msg":"Server listening at http://192.168.0.117:8787"}
+{"level":30,"time":1771906042790,"pid":99703,"hostname":"MacBook-Pro-3.local","msg":"Server listening at http://192.168.64.1:8787"}
+{"level":30,"time":1771906042790,"pid":99703,"hostname":"MacBook-Pro-3.local","host":"0.0.0.0","port":8787,"msg":"freecast-sync-hub listening"}
