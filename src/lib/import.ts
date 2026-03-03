@@ -22,9 +22,21 @@ export function markdownToHtml(md: string): string {
       continue;
     }
 
-    // Blank line — skip
+    // Blank lines: jsonToMarkdown uses join("\n") so each pair of top-level block
+    // nodes is separated by 1 extra "\n". This means:
+    //   1 blank line  = paragraph separator   → 0 empty paragraphs
+    //   3 blank lines = 1 empty paragraph     → 1 <p></p>
+    //   N blank lines = (N-1)/2 empty paras
     if (!line.trim()) {
-      i++;
+      let blankCount = 0;
+      while (i < lines.length && !lines[i].trim()) {
+        blankCount++;
+        i++;
+      }
+      const emptyParas = Math.floor((blankCount - 1) / 2);
+      for (let b = 0; b < emptyParas; b++) {
+        html.push("<p></p>");
+      }
       continue;
     }
 
@@ -64,45 +76,11 @@ export function markdownToHtml(md: string): string {
       continue;
     }
 
-    // Task list (must check before regular unordered list)
-    if (/^[-*]\s+\[[ xX]\]\s/.test(line)) {
-      const items: string[] = [];
-      while (i < lines.length) {
-        const tm = lines[i].match(/^[-*]\s+\[([ xX])\]\s+(.*)/);
-        if (!tm) break;
-        const checked = tm[1] !== " ";
-        items.push(
-          `<li data-type="taskItem" data-checked="${checked}"><p>${parseInline(tm[2])}</p></li>`,
-        );
-        i++;
-      }
-      html.push(`<ul data-type="taskList">${items.join("")}</ul>`);
-      continue;
-    }
-
-    // Unordered list
-    if (/^[-*]\s+/.test(line)) {
-      const items: string[] = [];
-      while (i < lines.length && /^[-*]\s+/.test(lines[i])) {
-        items.push(
-          `<li><p>${parseInline(lines[i].replace(/^[-*]\s+/, ""))}</p></li>`,
-        );
-        i++;
-      }
-      html.push(`<ul>${items.join("")}</ul>`);
-      continue;
-    }
-
-    // Ordered list
-    if (/^\d+\.\s+/.test(line)) {
-      const items: string[] = [];
-      while (i < lines.length && /^\d+\.\s+/.test(lines[i])) {
-        items.push(
-          `<li><p>${parseInline(lines[i].replace(/^\d+\.\s+/, ""))}</p></li>`,
-        );
-        i++;
-      }
-      html.push(`<ol>${items.join("")}</ol>`);
+    // List item (task, unordered, or ordered) — handles nested indentation recursively
+    if (/^[-*]\s+/.test(line) || /^\d+\.\s+/.test(line)) {
+      const { html: listHtml, endIndex } = parseListBlock(lines, i, 0);
+      html.push(listHtml);
+      i = endIndex;
       continue;
     }
 
@@ -125,6 +103,103 @@ export function markdownToHtml(md: string): string {
   }
 
   return html.join("");
+}
+
+/**
+ * Returns true if `line` is a list item at exactly `indentLevel` (2 spaces per level).
+ */
+function isListItemAt(line: string, indentLevel: number): boolean {
+  const expectedIndent = "  ".repeat(indentLevel);
+  if (!line.startsWith(expectedIndent)) return false;
+  const trimmed = line.slice(expectedIndent.length);
+  // Must not start with more spaces (deeper level)
+  if (trimmed.startsWith(" ")) return false;
+  return /^[-*]\s+/.test(trimmed) || /^\d+\.\s+/.test(trimmed);
+}
+
+/**
+ * Recursively parse a list block (ul, ol, or taskList) at a given indent level.
+ * Handles nested lists by recursing when the next line is more indented.
+ */
+function parseListBlock(
+  lines: string[],
+  startIndex: number,
+  indentLevel: number,
+): { html: string; endIndex: number } {
+  const indent = "  ".repeat(indentLevel);
+  let i = startIndex;
+
+  // Determine list type from first item
+  const trimmedFirst = lines[i].slice(indent.length);
+  const isTask = /^[-*]\s+\[[ xX]\]\s/.test(trimmedFirst);
+  const isOrdered = !isTask && /^\d+\.\s+/.test(trimmedFirst);
+
+  const openTag = isTask ? '<ul data-type="taskList">' : isOrdered ? "<ol>" : "<ul>";
+  const closeTag = isOrdered ? "</ol>" : "</ul>";
+
+  const items: string[] = [];
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Stop at blank lines (list ended)
+    if (!line.trim()) break;
+
+    // Stop if line is at a shallower indent
+    const lineIndentSpaces = (line.match(/^(\s*)/) ?? ["", ""])[1].length;
+    if (lineIndentSpaces < indent.length) break;
+
+    const trimmedLine = line.slice(indent.length);
+
+    // Skip deeper-indented lines (should have been consumed recursively, but guard anyway)
+    if (trimmedLine.startsWith(" ")) {
+      i++;
+      continue;
+    }
+
+    // Stop if item type doesn't match this list
+    const lineIsTask = /^[-*]\s+\[[ xX]\]\s/.test(trimmedLine);
+    const lineIsOrdered = /^\d+\.\s+/.test(trimmedLine);
+    const lineIsUnordered = !lineIsTask && /^[-*]\s+/.test(trimmedLine);
+
+    if (isTask && !lineIsTask) break;
+    if (isOrdered && !lineIsOrdered) break;
+    if (!isTask && !isOrdered && (lineIsTask || lineIsOrdered || !lineIsUnordered)) break;
+
+    // Parse item content
+    const taskMatch = trimmedLine.match(/^[-*]\s+\[([ xX])\]\s+(.*)/);
+    const ulMatch = !taskMatch ? trimmedLine.match(/^[-*]\s+(.*)/) : null;
+    const olMatch = !taskMatch && !ulMatch ? trimmedLine.match(/^\d+\.\s+(.*)/) : null;
+
+    const itemContent = taskMatch
+      ? taskMatch[2]
+      : ulMatch
+        ? ulMatch[1]
+        : olMatch
+          ? olMatch[1]
+          : trimmedLine;
+    const isChecked = taskMatch ? taskMatch[1] !== " " : false;
+
+    i++; // advance past this item line
+
+    // Recurse into nested list if next line is more indented
+    let nestedHtml = "";
+    if (i < lines.length && lines[i].trim() && isListItemAt(lines[i], indentLevel + 1)) {
+      const result = parseListBlock(lines, i, indentLevel + 1);
+      nestedHtml = result.html;
+      i = result.endIndex;
+    }
+
+    if (isTask) {
+      items.push(
+        `<li data-type="taskItem" data-checked="${isChecked}"><p>${parseInline(itemContent)}</p>${nestedHtml}</li>`,
+      );
+    } else {
+      items.push(`<li><p>${parseInline(itemContent)}</p>${nestedHtml}</li>`);
+    }
+  }
+
+  return { html: `${openTag}${items.join("")}${closeTag}`, endIndex: i };
 }
 
 function parseInline(text: string): string {
