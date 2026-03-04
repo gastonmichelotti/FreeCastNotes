@@ -135,6 +135,26 @@ function nodeToMarkdown(node: TipTapNode, depth: number): string {
     case "horizontalRule":
       return "---\n";
 
+    case "table": {
+      const rows = node.content || [];
+      if (rows.length === 0) return "";
+      const mdRows: string[] = [];
+      rows.forEach((row, rowIdx) => {
+        const cells = row.content || [];
+        const cellTexts = cells.map((cell) => {
+          // cell content is a paragraph node
+          const para = cell.content?.[0];
+          return para ? inlineContent(para).replace(/\|/g, "\\|") : "";
+        });
+        mdRows.push("| " + cellTexts.join(" | ") + " |");
+        // Insert separator after header row
+        if (rowIdx === 0) {
+          mdRows.push("| " + cellTexts.map(() => "---").join(" | ") + " |");
+        }
+      });
+      return mdRows.join("\n") + "\n";
+    }
+
     case "image": {
       const src = (node.attrs?.src as string) || "";
       const alt = (node.attrs?.alt as string) || "";

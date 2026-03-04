@@ -30,6 +30,14 @@ export const KeyboardShortcuts = Extension.create({
 
       // Strikethrough: ⇧⌘S
       "Shift-Mod-s": () => this.editor.commands.toggleStrike(),
+
+      // Insert table: ⌘T
+      "Mod-t": () =>
+        this.editor.commands.insertTable({
+          rows: 3,
+          cols: 2,
+          withHeaderRow: true,
+        }),
     };
   },
 });

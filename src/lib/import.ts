@@ -84,6 +84,31 @@ export function markdownToHtml(md: string): string {
       continue;
     }
 
+    // GFM Table: starts with a pipe and is followed by a separator row
+    if (line.trimStart().startsWith("|") && i + 1 < lines.length) {
+      const separatorRow = lines[i + 1];
+      if (/^\|?[\s\-:|]+\|/.test(separatorRow)) {
+        const headerCells = parseTableRow(line);
+        const tableRows: string[] = [];
+        // Header row
+        const ths = headerCells
+          .map((c) => `<th>${parseInline(c)}</th>`)
+          .join("");
+        tableRows.push(`<tr>${ths}</tr>`);
+        i += 2; // skip header + separator
+        while (i < lines.length && lines[i].trimStart().startsWith("|")) {
+          const cells = parseTableRow(lines[i]);
+          const tds = cells.map((c) => `<td>${parseInline(c)}</td>`).join("");
+          tableRows.push(`<tr>${tds}</tr>`);
+          i++;
+        }
+        html.push(
+          `<table><thead>${tableRows[0]}</thead><tbody>${tableRows.slice(1).join("")}</tbody></table>`,
+        );
+        continue;
+      }
+    }
+
     // Blockquote
     if (line.startsWith(">")) {
       const quoteLines: string[] = [];
@@ -239,6 +264,14 @@ function parseInline(text: string): string {
   });
 
   return result;
+}
+
+function parseTableRow(line: string): string[] {
+  return line
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
 }
 
 function escapeHtml(text: string): string {

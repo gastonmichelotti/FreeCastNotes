@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { EditorContent, type Editor as TipTapEditor } from "@tiptap/react";
+import TableBubbleMenu from "./TableBubbleMenu";
 import "./styles.css";
 
 interface EditorProps {
@@ -24,6 +25,7 @@ export default function Editor({ editor }: EditorProps) {
       className="flex-1 cursor-text overflow-y-auto px-4 py-3"
       onClick={handleClick}
     >
+      {editor && <TableBubbleMenu editor={editor} />}
       <EditorContent editor={editor} />
     </div>
   );

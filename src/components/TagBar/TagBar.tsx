@@ -52,7 +52,7 @@ export default function TagBar({ inline = false }: TagBarProps) {
 
   return (
     <div
-      className={`flex items-center gap-1.5 ${inline ? "flex-nowrap py-0 px-0" : "flex-wrap px-6 pb-2 pt-1"}`}
+      className={`flex flex-wrap items-center gap-1.5 ${inline ? "" : "px-6 pb-2 pt-1"}`}
     >
       {tags.map((tag) => (
         <span

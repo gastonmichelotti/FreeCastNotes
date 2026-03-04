@@ -249,3 +249,68 @@
 .tiptap p {
   margin: 0.15em 0;
 }
+
+/* ── Tables ── */
+.tiptap table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.6em 0;
+  table-layout: fixed;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.tiptap table td,
+.tiptap table th {
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  padding: 7px 12px;
+  vertical-align: top;
+  min-width: 60px;
+  position: relative;
+}
+
+.tiptap table th {
+  background: rgba(255, 255, 255, 0.07);
+  font-weight: 600;
+  color: #f0f0f2;
+  text-align: left;
+}
+
+.tiptap table td {
+  color: #e5e5e7;
+}
+
+.tiptap table .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(99, 102, 241, 0.15);
+  pointer-events: none;
+}
+
+/* ── Table column resize ── */
+.tableWrapper {
+  overflow-x: auto;
+}
+
+.tiptap table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--accent-color, #6366f1);
+  cursor: col-resize;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.tiptap table td:hover .column-resize-handle,
+.tiptap table th:hover .column-resize-handle,
+.resize-cursor .column-resize-handle {
+  opacity: 0.65;
+}
+
+.resize-cursor {
+  cursor: col-resize;
+}

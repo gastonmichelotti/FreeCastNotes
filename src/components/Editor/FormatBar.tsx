@@ -264,6 +264,20 @@ export default function FormatBar({
           }}
           tooltip="Insert image"
         />
+        <FormatBtn
+          icon={<TableIcon />}
+          active={isActive("table")}
+          onClick={() =>
+            run(() =>
+              editor
+                .chain()
+                .focus()
+                .insertTable({ rows: 3, cols: 2, withHeaderRow: true })
+                .run(),
+            )
+          }
+          tooltip="Insert table"
+        />
       </div>
 
       {/* Close button */}
@@ -527,6 +541,24 @@ function ImageIcon() {
       <rect x="2.5" y="3.5" width="15" height="13" rx="2.5" />
       <circle cx="7" cy="8" r="1.5" />
       <path d="M17.5 13.5 13 9l-6 6" />
+    </svg>
+  );
+}
+
+function TableIcon() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      className="h-[17px] w-[17px]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="2.5" y="3.5" width="15" height="13" rx="2" />
+      <path d="M2.5 8h15" />
+      <path d="M8.5 8v8.5" />
     </svg>
   );
 }

@@ -5,6 +5,10 @@ import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
+import { Table } from "@tiptap/extension-table";
+import { TableRow } from "@tiptap/extension-table-row";
+import { TableCell } from "@tiptap/extension-table-cell";
+import { TableHeader } from "@tiptap/extension-table-header";
 import type { EditorView } from "@tiptap/pm/view";
 import { KeyboardShortcuts } from "../components/Editor/extensions/KeyboardShortcuts";
 import { SearchAndReplace } from "../components/Editor/extensions/SearchAndReplace";
@@ -54,6 +58,10 @@ export function useAppEditor() {
         nested: true,
         HTMLAttributes: { class: "task-item" },
       }),
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableCell,
+      TableHeader,
       KeyboardShortcuts,
       SearchAndReplace,
       ResizableImage.configure({

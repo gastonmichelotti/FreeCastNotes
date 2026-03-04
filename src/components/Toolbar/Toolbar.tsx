@@ -54,10 +54,10 @@ export default function Toolbar({
           />
         </div>
 
-        {/* Title + Tags as one centered unit (full window) */}
+        {/* Title centered */}
         <div
           data-drag-region
-          className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2"
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
         >
           <span
             data-drag-region
@@ -65,7 +65,6 @@ export default function Toolbar({
           >
             {title}
           </span>
-          {children}
         </div>
 
         {/* Right buttons */}
@@ -93,6 +92,12 @@ export default function Toolbar({
           />
         </div>
       </div>
+      {/* Tag row — rendered below the main toolbar row when tags are visible */}
+      {children && (
+        <div className="flex justify-center px-3 pb-2">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
