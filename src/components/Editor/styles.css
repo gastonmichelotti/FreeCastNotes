@@ -53,6 +53,43 @@
   color: #ebebed;
 }
 
+.tiptap .collapsible-heading {
+  position: relative;
+}
+
+.tiptap .heading-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1em;
+  height: 1.1em;
+  margin-right: 0.35em;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(229, 229, 231, 0.56);
+  cursor: pointer;
+  font-size: 0.8em;
+  line-height: 1;
+  vertical-align: baseline;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.tiptap .heading-collapse-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(245, 245, 247, 0.92);
+}
+
+.tiptap .collapsible-heading.is-collapsed {
+  margin-bottom: 0.1em;
+}
+
+.tiptap .collapsed-heading-content {
+  display: none;
+}
+
 /* ── Code Block ── */
 .tiptap pre {
   background: rgba(255, 255, 255, 0.11);

@@ -108,6 +108,7 @@ function App() {
     if (importContentRef.current) {
       const html = importContentRef.current;
       importContentRef.current = null;
+      editor.commands.clearCollapsedHeadings();
       editor.commands.setContent(html);
       isLoadingNoteRef.current = false;
       requestAnimationFrame(() => editor.commands.focus("end"));
@@ -120,15 +121,19 @@ function App() {
         // Legacy TipTap JSON (notes migrated from localStorage)
         try {
           const json = JSON.parse(noteContent);
+          editor.commands.clearCollapsedHeadings();
           editor.commands.setContent(json);
         } catch {
+          editor.commands.clearCollapsedHeadings();
           editor.commands.setContent("");
         }
       } else {
         // Vault mode: Markdown content (images already resolved to base64 by Swift)
+        editor.commands.clearCollapsedHeadings();
         editor.commands.setContent(markdownToHtml(noteContent));
       }
     } else {
+      editor.commands.clearCollapsedHeadings();
       editor.commands.setContent("");
     }
 

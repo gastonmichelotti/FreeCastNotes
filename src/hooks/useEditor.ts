@@ -13,6 +13,7 @@ import type { EditorView } from "@tiptap/pm/view";
 import { KeyboardShortcuts } from "../components/Editor/extensions/KeyboardShortcuts";
 import { SearchAndReplace } from "../components/Editor/extensions/SearchAndReplace";
 import { ResizableImage } from "../components/Editor/extensions/ResizableImage";
+import { CollapsibleHeadings } from "../components/Editor/extensions/CollapsibleHeadings";
 import { compressImage, validateImageFile } from "../lib/imageUtils";
 
 /**
@@ -64,6 +65,7 @@ export function useAppEditor() {
       TableHeader,
       KeyboardShortcuts,
       SearchAndReplace,
+      CollapsibleHeadings,
       ResizableImage.configure({
         inline: false,
         allowBase64: true,
