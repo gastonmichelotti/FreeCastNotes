@@ -28,10 +28,9 @@ enum WindowPositioner {
         window.setFrameOrigin(NSPoint(x: x, y: y))
     }
 
-    /// Show window on top, positioned near cursor
+    /// Show window on top at its current frame origin
     static func showOnTop(_ window: NSWindow) {
         window.orderOut(nil) // Hide first to reset state
-        positionNearCursor(window)
         window.setIsVisible(true)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
