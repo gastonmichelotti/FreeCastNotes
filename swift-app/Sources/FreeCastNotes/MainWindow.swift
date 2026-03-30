@@ -17,7 +17,7 @@ class MainWindow: NSWindow {
         isMovableByWindowBackground = false
 
         // Size constraints (fixed width, variable height)
-        minSize = NSSize(width: 650, height: 700)
+        minSize = NSSize(width: 300, height: 400)
         maxSize = NSSize(width: NSScreen.main?.frame.width ?? 1800, height: NSScreen.main?.frame.height ?? 1200)
 
         // Floating behavior
