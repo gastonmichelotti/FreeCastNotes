@@ -22,12 +22,13 @@ export default function NotesBrowser({ open, onClose, defaultSearch = "" }: Note
     setSearch(defaultSearch);
   }, [defaultSearch]);
 
-  // Focus search input when panel opens
+  // Reset search and focus input whenever the panel opens.
   useEffect(() => {
     if (open) {
+      setSearch(defaultSearch);
       setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 50);
     }
-  }, [open]);
+  }, [open, defaultSearch]);
 
   const visibleNotes = useMemo(
     () => (notes.length === 0 && currentNote ? [currentNote] : notes),

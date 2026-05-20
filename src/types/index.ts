@@ -1,3 +1,5 @@
+export type NoteVisibility = 'private' | 'unlisted' | 'public';
+
 export interface Note {
   id: string;
   content: string;
@@ -7,6 +9,11 @@ export interface Note {
   is_pinned: number; // 0 or 1 (SQLite boolean)
   pin_order: number;
   tags: string[];
+  // Web publishing fields (optional — absent means private)
+  visibility?: NoteVisibility;
+  edit_permission?: boolean;
+  published_slug?: string;
+  published_url?: string;
 }
 
 export type SortOrder = "modified" | "opened" | "title";

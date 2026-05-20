@@ -13,6 +13,8 @@ import TagBar from "./components/TagBar/TagBar";
 import { useAppEditor } from "./hooks/useEditor";
 import { useAppStore } from "./stores/appStore";
 import { extractTitle } from "./lib/utils";
+import VisibilityPicker from "./components/Editor/VisibilityPicker";
+import type { NoteVisibility } from "./types/index";
 import { copyAsMarkdown, jsonToMarkdown } from "./lib/export";
 import { markdownToHtml } from "./lib/import";
 import * as db from "./lib/db";
@@ -46,6 +48,9 @@ function App() {
     layoutMode,
     setLayoutMode,
     reloadChangedNotes,
+    updateNoteVisibility,
+    updateNoteEditPermission,
+    hubConfig,
   } = useAppStore();
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -199,6 +204,7 @@ function App() {
 
   const openBrowse = useCallback(() => {
     setActionPanelOpen(false);
+    setBrowseDefaultSearch("");
     setBrowseOpen(true);
     loadNotes().catch((error) => {
       console.error("Failed to refresh notes before opening browser", error);
@@ -462,6 +468,7 @@ function App() {
           setBrowseOpen((isOpen) => {
             const next = !isOpen;
             if (next) {
+              setBrowseDefaultSearch("");
               loadNotes().catch((error) => {
                 console.error("Failed to refresh notes from shortcut", error);
               });
@@ -653,6 +660,27 @@ function App() {
         <FindBar editor={editor} onClose={() => setFindBarOpen(false)} />
       )}
       <Editor editor={editor} />
+      {currentNote && hubConfig.url && (
+        <div className="flex items-center gap-3 border-t border-white/8 px-4 py-1.5">
+          <span className="text-[11px] text-white/30">Visibility</span>
+          <VisibilityPicker
+            value={(currentNote.visibility ?? "private") as NoteVisibility}
+            onChange={(v) => updateNoteVisibility(currentNote.id, v)}
+            editPermission={currentNote.edit_permission ?? false}
+            onEditPermissionChange={(enabled) => updateNoteEditPermission(currentNote.id, enabled)}
+          />
+          {currentNote.published_slug && hubConfig.url && (
+            <a
+              href={`${hubConfig.url}/${currentNote.published_slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-auto text-[11px] text-white/30 hover:text-white/50 transition-colors"
+            >
+              /{currentNote.published_slug} ↗
+            </a>
+          )}
+        </div>
+      )}
       <FormatBar editor={editor} chromeActive={chromeActive} />
     </>
   );

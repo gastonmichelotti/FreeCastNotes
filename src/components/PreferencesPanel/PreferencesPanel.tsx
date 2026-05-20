@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { SortOrder } from "../../types/index";
 import { useAppStore } from "../../stores/appStore";
 import { bridge } from "../../lib/bridge";
+import HubTab from "./HubTab";
 
 interface PreferencesPanelProps {
   open: boolean;
@@ -889,6 +890,12 @@ export default function PreferencesPanel({
                 )}
               </>
             )}
+          </div>
+
+          {/* Hub section */}
+          <div className="space-y-3 px-4 py-4">
+            <p className="text-[11px] uppercase tracking-wide text-[#E5E5E7]/40">Hub</p>
+            <HubTab />
           </div>
 
           {/* Global Shortcut section */}

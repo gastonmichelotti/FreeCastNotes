@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { Note, SortOrder } from "../types/index";
 import * as db from "../lib/db";
 import { runMigrationIfNeeded } from "../lib/migration";
+import { bridge } from "../lib/bridge";
 
 interface AppState {
   notes: Note[];
@@ -49,6 +50,15 @@ interface AppState {
   // Sort
   sortOrder: SortOrder;
   setSortOrder: (order: SortOrder) => void;
+
+  // Hub
+  hubConfig: { url: string; hasToken: boolean; connected: boolean };
+  setHubConfig: (config: { url: string; hasToken: boolean; connected: boolean }) => void;
+  testHubConnection: () => Promise<void>;
+
+  // Note publishing
+  updateNoteVisibility: (id: string, visibility: import("../types/index").NoteVisibility) => Promise<void>;
+  updateNoteEditPermission: (id: string, editPermission: boolean) => Promise<void>;
 }
 
 const _PREFS_KEY = "freecastnotes.prefs.v1";
@@ -339,4 +349,63 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ sortOrder: order, notes: db.sortNotes(notes, order) });
     _savePrefs({ sortOrder: order });
   },
+
+  // Hub
+  hubConfig: { url: "", hasToken: false, connected: false },
+  setHubConfig: (config) => set({ hubConfig: config }),
+  testHubConnection: async () => {
+    const result = await bridge.hubTestConnection();
+    set((state) => ({
+      hubConfig: { ...state.hubConfig, connected: result.ok },
+    }));
+  },
+
+  // Note publishing
+  updateNoteVisibility: async (id, visibility) => {
+    try {
+      await db.updateNoteVisibility(id, visibility);
+      set((state) => ({
+        notes: state.notes.map((n) => (n.id === id ? { ...n, visibility } : n)),
+        currentNote: state.currentNote?.id === id ? { ...state.currentNote, visibility } : state.currentNote,
+      }));
+      // Push to Hub if visibility changed to public/unlisted
+      if (visibility !== "private") {
+        const result = await bridge.syncRunNow();
+        if (!result.ok) {
+          set((state) => ({ hubConfig: { ...state.hubConfig, connected: false } }));
+        }
+        checkSyncConflicts(result, get);
+      }
+    } catch (error) {
+      console.error("Failed to update note visibility", error);
+      get().showToast("Could not update visibility");
+    }
+  },
+
+  updateNoteEditPermission: async (id, editPermission) => {
+    try {
+      await db.updateNoteEditPermission(id, editPermission);
+      set((state) => ({
+        notes: state.notes.map((n) => (n.id === id ? { ...n, edit_permission: editPermission } : n)),
+        currentNote: state.currentNote?.id === id ? { ...state.currentNote, edit_permission: editPermission } : state.currentNote,
+      }));
+      // Sync to push updated permissions to Hub
+      const result = await bridge.syncRunNow();
+      checkSyncConflicts(result, get);
+    } catch (error) {
+      console.error("Failed to update note edit permission", error);
+      get().showToast("Could not update edit permission");
+    }
+  },
 }));
+
+function checkSyncConflicts(result: Record<string, unknown>, get: () => AppState) {
+  // Swift returns summary.push.conflicts (count) or summary.manifest.conflictCount
+  const summary = result?.summary as Record<string, unknown> | undefined;
+  const pushConflicts = (summary?.push as Record<string, unknown>)?.conflicts;
+  const manifestConflicts = (summary?.manifest as Record<string, unknown>)?.conflictCount;
+  const count = Number(pushConflicts ?? manifestConflicts ?? 0);
+  if (count > 0) {
+    get().showToast(`Conflict resolved — Hub version applied for ${count} note${count > 1 ? "s" : ""}`);
+  }
+}

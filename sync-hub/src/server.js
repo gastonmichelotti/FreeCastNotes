@@ -4,11 +4,14 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import Fastify from 'fastify';
 import rateLimit from '@fastify/rate-limit';
+import fastifyStatic from '@fastify/static';
 import { getConfig } from './config.js';
 import { SyncStore } from './db.js';
 import { normalizeRelativePath, normalizeWorkspaceId, resolveWorkspaceFilePath } from './path-utils.js';
 import { authPreHandler } from './auth.js';
-import { validateNoteFrontmatter } from './note-frontmatter.js';
+import { validateNoteFrontmatter, parseNoteFrontmatter, ensureNoteFrontmatter } from './note-frontmatter.js';
+import { assignUniqueSlug, extractTitle } from './slug.js';
+import { registerPublicRoutes } from './public-handler.js';
 
 const DIRECTIONS = ['upload_only', 'download_only', 'bidirectional'];
 const CONFLICT_POLICIES = ['latest_modified_wins'];
@@ -344,6 +347,73 @@ export async function buildServer(options = {}) {
             nowMs: t,
           });
           applied.push(relPath);
+
+          // Sync hub_notes for .md files with visibility metadata
+          if (relPath.endsWith('.md')) {
+            try {
+              const text = buf.toString('utf8');
+              const parsed = parseNoteFrontmatter(text);
+              if (parsed.hasFrontmatter && parsed.meta) {
+                const visibility = parsed.meta.visibility ?? 'private';
+                const editPermission = parsed.meta.edit_permission === true ? 1 : 0;
+                const existingSlug = parsed.meta.published_slug ?? null;
+
+                if (visibility !== 'private' || existingSlug) {
+                  const title = extractTitle(text, relPath.replace(/\.md$/, ''));
+                  const slug = existingSlug || assignUniqueSlug(app.syncStore, title, workspaceId, relPath);
+                  app.syncStore.upsertHubNote({
+                    workspaceId,
+                    path: relPath,
+                    slug,
+                    title,
+                    visibility,
+                    editPermission,
+                    contentMd: parsed.body ?? '',
+                    updatedAtMs: incoming.mtimeMs,
+                  });
+
+                  // Write slug back to file frontmatter if newly assigned
+                  if (!existingSlug) {
+                    const nowIso = new Date().toISOString();
+                    const { content: updatedContent, changed } = ensureNoteFrontmatter(text, {
+                      nowIso,
+                      idFactory: () => parsed.meta.id ?? crypto.randomUUID?.() ?? nowIso,
+                    });
+                    if (changed || !updatedContent.includes('published_slug:')) {
+                      // Inject published_slug into frontmatter manually since ensureNoteFrontmatter
+                      // doesn't know about our custom keys — patch the frontmatter block directly
+                      const withSlug = text.replace(
+                        /^(---\r?\n[\s\S]*?)((\r?\n)?---)/,
+                        (_, fm, closing) => {
+                          const alreadyHas = /^published_slug:/m.test(fm);
+                          if (alreadyHas) return _;
+                          return `${fm}published_slug: ${slug}${closing}`;
+                        },
+                      );
+                      const slugBuf = Buffer.from(withSlug, 'utf8');
+                      const newHash = sha256Hex(slugBuf);
+                      await fsp.writeFile(fullPath, slugBuf);
+                      await setFileMtime(fullPath, incoming.mtimeMs);
+                      app.syncStore.applyUpsert({
+                        workspaceId,
+                        path: relPath,
+                        sha256: newHash,
+                        size: slugBuf.length,
+                        mtimeMs: incoming.mtimeMs + 1,
+                        actorDeviceId: 'hub',
+                        nowMs: t,
+                      });
+                    }
+                  }
+                } else {
+                  // private and no existing slug: remove from hub_notes if present
+                  app.syncStore.deleteHubNote(workspaceId, relPath);
+                }
+              }
+            } catch {
+              // hub_notes sync is best-effort; don't fail the push
+            }
+          }
         } catch (err) {
           rejected.push({ path: relPath ?? incoming.path, reason: redactError(err) });
         }
@@ -380,6 +450,10 @@ export async function buildServer(options = {}) {
             actorDeviceId: body.deviceId,
             nowMs: t,
           });
+          // Remove from hub_notes so slug permanently returns 404
+          if (relPath.endsWith('.md')) {
+            try { app.syncStore.deleteHubNote(workspaceId, relPath); } catch {}
+          }
           deleted.push(relPath);
         } catch (err) {
           rejected.push({ path: relPath ?? d.path, reason: redactError(err) });
@@ -475,6 +549,18 @@ export async function buildServer(options = {}) {
     request.log.error({ err: error.message }, 'unhandled_error');
     return reply.code(500).send({ error: 'internal_error' });
   });
+
+  // Serve compiled web editor bundle from sync-hub/web/dist/
+  const webDistPath = new URL('../../web/dist', import.meta.url).pathname;
+  if (fs.existsSync(webDistPath)) {
+    await app.register(fastifyStatic, {
+      root: webDistPath,
+      prefix: '/_static/',
+    });
+  }
+
+  // Public note routes (HTML, raw MD, JSON API)
+  await registerPublicRoutes(app, { hubBaseUrl: config.hubBaseUrl ?? '', workspacesRoot: config.workspacesRoot });
 
   return app;
 }

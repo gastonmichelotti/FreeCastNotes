@@ -6,7 +6,7 @@
  * getNote() returns resolved Markdown (base64-inlined images) for the editor.
  */
 
-import type { Note, DeletedNote, SortOrder } from "../types/index";
+import type { Note, DeletedNote, SortOrder, NoteVisibility } from "../types/index";
 import { bridge } from "./bridge";
 import { extractTitle } from "./utils";
 
@@ -29,6 +29,9 @@ interface FrontmatterMeta {
   tags?: string[];
   pinned?: boolean;
   pin_order?: number;
+  visibility?: NoteVisibility;
+  edit_permission?: boolean;
+  published_slug?: string;
 }
 
 // --- Helpers ---
@@ -99,6 +102,14 @@ function parseFrontmatter(fileContent: string): {
     } else if (key === "pin_order") {
       const n = parseInt(value, 10);
       if (!isNaN(n)) meta.pin_order = n;
+    } else if (key === "visibility") {
+      if (value === "public" || value === "unlisted" || value === "private") {
+        meta.visibility = value;
+      }
+    } else if (key === "edit_permission") {
+      meta.edit_permission = value === "true";
+    } else if (key === "published_slug") {
+      if (value) meta.published_slug = value;
     }
   }
 
@@ -113,6 +124,11 @@ function serializeNote(note: Note, body: string): string {
     lines.push("pinned: true");
     if (note.pin_order >= 0) lines.push(`pin_order: ${note.pin_order}`);
   }
+  if (note.visibility && note.visibility !== "private") {
+    lines.push(`visibility: ${note.visibility}`);
+  }
+  if (note.edit_permission) lines.push("edit_permission: true");
+  if (note.published_slug) lines.push(`published_slug: ${note.published_slug}`);
   lines.push("---", "", "");
   return lines.join("\n") + body;
 }
@@ -245,6 +261,9 @@ export async function listNotes(): Promise<Note[]> {
         is_pinned: meta.pinned ? 1 : 0,
         pin_order: meta.pin_order ?? -1,
         tags: meta.tags ?? [],
+        visibility: meta.visibility,
+        edit_permission: meta.edit_permission,
+        published_slug: meta.published_slug,
       };
 
       _filenameMap.set(meta.id, file.filename);
@@ -592,4 +611,39 @@ export function debugAttachments(id: string): void {
 // Expose debug function to window for console access
 if (typeof window !== "undefined") {
   (window as any).__debugAttachments = debugAttachments;
+}
+
+export async function updateNoteVisibility(id: string, visibility: NoteVisibility): Promise<void> {
+  const note = _notesMeta.get(id);
+  const filename = _filenameMap.get(id);
+  if (!note || !filename) return;
+  const updated: Note = { ...note, visibility, updated_at: now() };
+  const fileContent = serializeNote(updated, note.content);
+  await bridge.vaultWriteNote(filename, fileContent, []);
+  _notesMeta.set(id, updated);
+}
+
+export async function updateNoteEditPermission(id: string, editPermission: boolean): Promise<void> {
+  const note = _notesMeta.get(id);
+  const filename = _filenameMap.get(id);
+  if (!note || !filename) return;
+  const updated: Note = { ...note, edit_permission: editPermission, updated_at: now() };
+  const fileContent = serializeNote(updated, note.content);
+  await bridge.vaultWriteNote(filename, fileContent, []);
+  _notesMeta.set(id, updated);
+}
+
+export async function updateNotePublishedSlug(id: string, slug: string, hubUrl: string): Promise<void> {
+  const note = _notesMeta.get(id);
+  const filename = _filenameMap.get(id);
+  if (!note || !filename) return;
+  const updated: Note = {
+    ...note,
+    published_slug: slug,
+    published_url: `${hubUrl}/${slug}`,
+    updated_at: now(),
+  };
+  const fileContent = serializeNote(updated, note.content);
+  await bridge.vaultWriteNote(filename, fileContent, []);
+  _notesMeta.set(id, updated);
 }

@@ -330,6 +330,29 @@ export const bridge = {
     return Promise.resolve({ ok: false, error: "Swift bridge unavailable" });
   },
 
+  // --- Hub Publishing ---
+
+  hubGetConfig: (): Promise<{ url: string; hasToken: boolean; connected: boolean }> => {
+    if (isSwiftAvailable()) {
+      return window.swiftBridge!.call("hubGetConfig") as Promise<{ url: string; hasToken: boolean; connected: boolean }>;
+    }
+    return Promise.resolve({ url: "", hasToken: false, connected: false });
+  },
+
+  hubSetConfig: (config: { url: string; token: string }): Promise<{ ok: boolean; error?: string }> => {
+    if (isSwiftAvailable()) {
+      return window.swiftBridge!.call("hubSetConfig", config, 15000) as Promise<{ ok: boolean; error?: string }>;
+    }
+    return Promise.resolve({ ok: true });
+  },
+
+  hubTestConnection: (): Promise<{ ok: boolean; latencyMs: number; error?: string }> => {
+    if (isSwiftAvailable()) {
+      return window.swiftBridge!.call("hubTestConnection", {}, 30000) as Promise<{ ok: boolean; latencyMs: number; error?: string }>;
+    }
+    return Promise.resolve({ ok: false, latencyMs: 0, error: "Swift bridge unavailable" });
+  },
+
   // Event listeners (Swift → React via CustomEvent)
   on: (event: string, callback: () => void): (() => void) => {
     const handler = () => callback();

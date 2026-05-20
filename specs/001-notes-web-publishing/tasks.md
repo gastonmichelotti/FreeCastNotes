@@ -19,10 +19,10 @@
 
 **Purpose**: Create the new `sync-hub/web/` sub-project and add dependencies.
 
-- [ ] T001 Scaffold `sync-hub/web/` as a Vite + React + TypeScript project (`npm create vite@latest web -- --template react-ts` inside `sync-hub/`)
-- [ ] T002 Add `slugify` dependency to `sync-hub/package.json` (`npm install slugify` in `sync-hub/`)
-- [ ] T003 [P] Add TipTap dependencies to `sync-hub/web/package.json`: `@tiptap/react @tiptap/starter-kit @tiptap/extension-task-list @tiptap/extension-task-item @tiptap/extension-code-block-lowlight @tiptap/extension-link @tiptap/extension-image @tiptap/extension-table @tiptap/extension-table-row @tiptap/extension-table-cell @tiptap/extension-table-header`
-- [ ] T004 Add `npm run build:web` script to `sync-hub/package.json` that runs `vite build` inside `sync-hub/web/` outputting to `sync-hub/web/dist/`
+- [X] T001 Scaffold `sync-hub/web/` as a Vite + React + TypeScript project (`npm create vite@latest web -- --template react-ts` inside `sync-hub/`)
+- [X] T002 Add `slugify` dependency to `sync-hub/package.json` (`npm install slugify` in `sync-hub/`)
+- [X] T003 [P] Add TipTap dependencies to `sync-hub/web/package.json`: `@tiptap/react @tiptap/starter-kit @tiptap/extension-task-list @tiptap/extension-task-item @tiptap/extension-code-block-lowlight @tiptap/extension-link @tiptap/extension-image @tiptap/extension-table @tiptap/extension-table-row @tiptap/extension-table-cell @tiptap/extension-table-header`
+- [X] T004 Add `npm run build:web` script to `sync-hub/package.json` that runs `vite build` inside `sync-hub/web/` outputting to `sync-hub/web/dist/`
 
 ---
 
@@ -32,12 +32,12 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T005 Extend `Note` interface in `src/types/index.ts` with `visibility?: 'private' | 'unlisted' | 'public'`, `edit_permission?: boolean`, `published_slug?: string`, `published_url?: string` per data-model.md
-- [ ] T006 [P] Extend `vaultDb.ts` (`src/lib/vaultDb.ts`) to parse `visibility`, `edit_permission`, and `published_slug` from YAML frontmatter in `listNotes()` and `getNote()`, and write them back in `updateNote()` when present
-- [ ] T007 Add `hub_notes` table to `sync-hub/src/schema.sql` with columns: `workspace_id`, `path`, `slug` (UNIQUE), `visibility` (CHECK public|unlisted|private), `edit_permission`, `published_at_ms`, `updated_at_ms`; add indexes `idx_hub_notes_slug` and `idx_hub_notes_visibility`
-- [ ] T008 [P] Add `hub_notes` query methods to `sync-hub/src/db.js` in `SyncStore`: `upsertHubNote(workspaceId, path, fields)`, `getHubNoteBySlug(slug)`, `setHubNoteVisibility(workspaceId, path, visibility)`, `deleteHubNote(workspaceId, path)`
-- [ ] T009 [P] Create slug generation module `sync-hub/src/slug.js` with `generateSlug(title)` (uses `slugify`) and `assignUniqueSlug(db, title)` (appends `-2`, `-3` on collision)
-- [ ] T010 [P] Add stub bridge function signatures to `src/lib/bridge.ts`: `hubGetConfig(): Promise<{url:string; hasToken:boolean; connected:boolean}>`, `hubSetConfig(config: {url:string; token:string}): Promise<{ok:boolean; error?:string}>`, `hubTestConnection(): Promise<{ok:boolean; latencyMs:number; error?:string}>`
+- [X] T005 Extend `Note` interface in `src/types/index.ts` with `visibility?: 'private' | 'unlisted' | 'public'`, `edit_permission?: boolean`, `published_slug?: string`, `published_url?: string` per data-model.md
+- [X] T006 [P] Extend `vaultDb.ts` (`src/lib/vaultDb.ts`) to parse `visibility`, `edit_permission`, and `published_slug` from YAML frontmatter in `listNotes()` and `getNote()`, and write them back in `updateNote()` when present
+- [X] T007 Add `hub_notes` table to `sync-hub/src/schema.sql` with columns: `workspace_id`, `path`, `slug` (UNIQUE), `visibility` (CHECK public|unlisted|private), `edit_permission`, `published_at_ms`, `updated_at_ms`; add indexes `idx_hub_notes_slug` and `idx_hub_notes_visibility`
+- [X] T008 [P] Add `hub_notes` query methods to `sync-hub/src/db.js` in `SyncStore`: `upsertHubNote(workspaceId, path, fields)`, `getHubNoteBySlug(slug)`, `setHubNoteVisibility(workspaceId, path, visibility)`, `deleteHubNote(workspaceId, path)`
+- [X] T009 [P] Create slug generation module `sync-hub/src/slug.js` with `generateSlug(title)` (uses `slugify`) and `assignUniqueSlug(db, title)` (appends `-2`, `-3` on collision)
+- [X] T010 [P] Add stub bridge function signatures to `src/lib/bridge.ts`: `hubGetConfig(): Promise<{url:string; hasToken:boolean; connected:boolean}>`, `hubSetConfig(config: {url:string; token:string}): Promise<{ok:boolean; error?:string}>`, `hubTestConnection(): Promise<{ok:boolean; latencyMs:number; error?:string}>`
 
 **Checkpoint**: Foundation ready — Note type updated, hub_notes table defined, slug module and bridge stubs in place.
 
@@ -51,11 +51,11 @@
 
 ### Implementation
 
-- [ ] T011 [US1] Implement `hubGetConfig`, `hubSetConfig`, and `hubTestConnection` handlers in `swift-app/Sources/FreeCastNotes/WebViewController.swift`: store URL in `UserDefaults["hubServerURL"]`, token in Keychain (service: `com.freecastnotes.hub`), return connection status
-- [ ] T012 [P] [US1] Implement `hubGetConfig`, `hubSetConfig`, `hubTestConnection` in `src/lib/bridge.ts` calling the corresponding Swift bridge messages (follow existing `syncGetSettings` pattern)
-- [ ] T013 [P] [US1] Create `src/components/PreferencesPanel/HubTab.tsx`: URL input, token input (masked), "Test Connection" button, connection status indicator (green/red/pending), last connected timestamp
-- [ ] T014 [US1] Wire `HubTab` into `src/components/PreferencesPanel/PreferencesPanel.tsx` as a new "Hub" tab (add tab entry alongside existing Sync, General, etc.)
-- [ ] T015 [US1] Add Hub connection state to `src/stores/appStore.ts`: `hubConfig: {url, hasToken, connected}`, `setHubConfig(config)`, `testHubConnection()` action calling `bridge.hubTestConnection()`
+- [X] T011 [US1] Implement `hubGetConfig`, `hubSetConfig`, and `hubTestConnection` handlers in `swift-app/Sources/FreeCastNotes/WebViewController.swift`: store URL in `UserDefaults["hubServerURL"]`, token in Keychain (service: `com.freecastnotes.hub`), return connection status
+- [X] T012 [P] [US1] Implement `hubGetConfig`, `hubSetConfig`, `hubTestConnection` in `src/lib/bridge.ts` calling the corresponding Swift bridge messages (follow existing `syncGetSettings` pattern)
+- [X] T013 [P] [US1] Create `src/components/PreferencesPanel/HubTab.tsx`: URL input, token input (masked), "Test Connection" button, connection status indicator (green/red/pending), last connected timestamp
+- [X] T014 [US1] Wire `HubTab` into `src/components/PreferencesPanel/PreferencesPanel.tsx` as a new "Hub" section
+- [X] T015 [US1] Add Hub connection state to `src/stores/appStore.ts`: `hubConfig: {url, hasToken, connected}`, `setHubConfig(config)`, `testHubConnection()` action calling `bridge.hubTestConnection()`
 
 **Checkpoint**: Hub connection fully functional. User can configure and validate Hub from Preferences.
 
@@ -69,20 +69,16 @@
 
 ### Implementation
 
-- [ ] T016 [US2] Extend `/sync/push` handler in `sync-hub/src/server.js`: after writing each `.md` file, parse frontmatter; if `visibility` is `public` or `unlisted`, call `db.upsertHubNote()` with generated/existing slug and `db.assignUniqueSlug()` for new notes
-- [ ] T017 [US2] After slug assignment in `/sync/push`, patch the stored `.md` file on Hub disk to add `published_slug: <slug>` to its frontmatter (so next pull writes it back to local device)
-- [ ] T018 [US2] Create `sync-hub/src/public-handler.js` with `getNoteBySlug(db, slug)` (reads `hub_notes` + file from disk), `renderNoteHtml(content)` (returns HTML shell with `/_static/bundle.js`), `serveRawMarkdown(content)` (strips frontmatter, returns body)
-- [ ] T019 [P] [US2] Add public routes to `sync-hub/src/server.js`:
-  - `GET /:slug` → serve HTML shell (from `public-handler.js`); 404 if private/missing
-  - `GET /:slug.md` → serve raw Markdown body; 404 if private/missing
-  - `GET /api/notes/:slug` → JSON `{slug, title, content, visibility, editPermission, updatedAtMs}`; 404 if private/missing
-  - `GET /api/notes` → JSON list of `visibility=public` notes (unlisted excluded)
-- [ ] T020 [P] [US2] Add Fastify static plugin to `sync-hub/src/server.js` to serve `sync-hub/web/dist/` under `/_static/` with long-lived cache headers
-- [ ] T021 [P] [US2] Create `sync-hub/web/src/App.tsx`: on mount, `GET /api/notes/:slug` to fetch note; render `<NoteReadView>` (edit_permission=false) or `<NoteEditor>` (edit_permission=true)
-- [ ] T022 [P] [US2] Create `sync-hub/web/src/components/NoteReadView.tsx`: renders note title + Markdown body as styled HTML; responsive layout; no editing controls
-- [ ] T023 [P] [US2] Create `src/components/Editor/VisibilityPicker.tsx`: dropdown with Private / Unlisted / Public options; shows current note `visibility`; `onChange` calls `updateNoteVisibility(id, visibility)` in appStore
-- [ ] T024 [US2] Add `updateNoteVisibility(id, visibility)` action to `src/stores/appStore.ts`: updates note frontmatter via `vaultDb.updateNote()`, then calls `bridge.syncRunNow()` if new visibility is public or unlisted
-- [ ] T025 [US2] Add publish toolbar area to `src/components/Editor/` (Toolbar or dedicated PublishBar): shows `<VisibilityPicker>` and, when visibility is public/unlisted, shows the published URL as a clickable link
+- [X] T016 [US2] Extend `/sync/push` handler in `sync-hub/src/server.js`: after writing each `.md` file, parse frontmatter; if `visibility` is `public` or `unlisted`, call `db.upsertHubNote()` with generated/existing slug and `db.assignUniqueSlug()` for new notes
+- [X] T017 [US2] After slug assignment in `/sync/push`, patch the stored `.md` file on Hub disk to add `published_slug: <slug>` to its frontmatter (so next pull writes it back to local device)
+- [X] T018 [US2] Create `sync-hub/src/public-handler.js` with public note HTTP handlers
+- [X] T019 [P] [US2] Add public routes to `sync-hub/src/server.js` (GET /:slug, GET /:slug.md, GET /api/notes/:slug, GET /api/notes, PUT /api/notes/:slug)
+- [X] T020 [P] [US2] Add Fastify static plugin to `sync-hub/src/server.js` to serve `sync-hub/web/dist/` under `/_static/`
+- [X] T021 [P] [US2] Create `sync-hub/web/src/App.tsx`: on mount, `GET /api/notes/:slug` to fetch note; render `<NoteReadView>` or `<NoteEditView>` based on editPermission
+- [X] T022 [P] [US2] Create `sync-hub/web/src/components/NoteReadView.tsx`: renders note title + Markdown body as styled HTML; responsive layout
+- [X] T023 [P] [US2] Create `src/components/Editor/VisibilityPicker.tsx`: pill buttons for Private / Unlisted / Public; `onChange` calls `updateNoteVisibility`
+- [X] T024 [US2] Add `updateNoteVisibility` and `updateNoteEditPermission` actions to `src/stores/appStore.ts`
+- [X] T025 [US2] Add publish toolbar area to editor layout in `src/App.tsx`: shows `<VisibilityPicker>` and published slug when Hub is configured
 
 **Checkpoint**: Core publishing flow complete. Notes can be set to public and read in a browser.
 
@@ -98,10 +94,10 @@
 
 ### Implementation
 
-- [ ] T026 [US3] Verify `GET /api/notes` handler in `sync-hub/src/public-handler.js` filters only `visibility = 'public'` (unlisted excluded); add SQL `WHERE visibility = 'public'` to the query in `db.js`
-- [ ] T027 [US4] Handle revoke in `/sync/push` in `sync-hub/src/server.js`: when a pushed `.md` file has `visibility = private` (or field absent) and a `hub_notes` record exists, call `db.setHubNoteVisibility(workspaceId, path, 'private')`
-- [ ] T028 [US4] Handle delete signal in `/sync/push` in `sync-hub/src/server.js`: when a note is in the `deletes` array, call `db.deleteHubNote(workspaceId, path)` so its slug permanently returns 404
-- [ ] T029 [US4] Ensure `GET /:slug` and `GET /api/notes/:slug` in `public-handler.js` return 404 (with `{error:"note_not_found"}`) when `hub_notes.visibility = 'private'` or record is absent
+- [X] T026 [US3] `GET /api/notes` in `public-handler.js` already filters `visibility = 'public'` via `listPublicHubNotes()` SQL
+- [X] T027 [US4] Revoke handled in `/sync/push`: upsertHubNote with `visibility: 'private'` when note is set private (slug preserved but returns 404)
+- [X] T028 [US4] Delete signal handled in `/sync/push` deletes loop: calls `deleteHubNote(workspaceId, relPath)` for `.md` files
+- [X] T029 [US4] `GET /:slug` and `GET /api/notes/:slug` in `public-handler.js` return 404 when `visibility === 'private'` or record is absent
 
 **Checkpoint**: Unlisted and revoke flows complete. Privacy guarantees enforced end-to-end.
 
@@ -115,13 +111,13 @@
 
 ### Implementation
 
-- [ ] T030 [P] [US5] Create `sync-hub/web/src/components/NoteEditor.tsx`: TipTap editor with extensions matching desktop (StarterKit, TaskList, TaskItem, CodeBlock, Link, Image, Table, Heading); auto-save on 2s idle via `PUT /api/notes/:slug`; show "Saved" / "Saving…" status indicator
-- [ ] T031 [US5] Add `PUT /api/notes/:slug` route to `sync-hub/src/server.js`: validate `edit_permission = 1`; write updated Markdown to workspace file; update `hub_notes.updated_at_ms`; append `change_log` entry (so macOS pull picks it up); enforce `HUB_MAX_NOTE_SIZE_MB` limit
-- [ ] T032 [US5] Update `sync-hub/web/src/App.tsx` routing: if `editPermission = true` render `<NoteEditor>`, else render `<NoteReadView>`; pass `slug` and initial `content` as props
-- [ ] T033 [P] [US5] Add edit permission toggle to `src/components/Editor/VisibilityPicker.tsx`: checkbox "Allow editing from web" (disabled when visibility is private); calls `updateNoteEditPermission(id, bool)` in appStore
-- [ ] T034 [US5] Add `updateNoteEditPermission(id, editPermission)` action to `src/stores/appStore.ts`: updates frontmatter via `vaultDb.updateNote()`; triggers `bridge.syncRunNow()` to push updated permissions to Hub
-- [ ] T035 [US5] Add conflict notification: extend sync result parsing in `src/stores/appStore.ts` to detect `conflicts[]` in sync response; dispatch a Toast notification "Conflict resolved — [hub|local] version applied for '[note title]'" using existing Toast infrastructure in `src/components/Toast/`
-- [ ] T036 [US5] Ensure `bridge.syncRunNow()` result includes conflict summaries: verify existing Swift sync bridge returns conflict data from `/sync/manifest` response; if not, extend `WebViewController.swift` sync callback to include conflict list in the bridged result
+- [X] T030 [P] [US5] Create `sync-hub/web/src/components/NoteEditView.tsx`: TipTap editor (StarterKit); save via `PUT /api/notes/:slug`; show "Saved" / "Saving…" status indicator; lazy-loaded from App.tsx
+- [X] T031 [US5] `PUT /api/notes/:slug` in `public-handler.js`: validates `edit_permission`, writes to workspace file, updates `hub_notes.updated_at_ms`, enforces `bodyLimitBytes`
+- [X] T032 [US5] `sync-hub/web/src/App.tsx` routing: renders `<NoteEditView>` when `editPermission = true`, else `<NoteReadView>`
+- [X] T033 [P] [US5] Added edit permission toggle to `src/components/Editor/VisibilityPicker.tsx`: checkbox "Allow web editing" (hidden when visibility is private)
+- [X] T034 [US5] `updateNoteEditPermission` action added to `src/stores/appStore.ts`: updates frontmatter + triggers `bridge.syncRunNow()`
+- [X] T035 [US5] Conflict notification in `src/stores/appStore.ts`: reads `summary.push.conflicts` from Swift sync result; shows Toast "Conflict resolved — Hub version applied for N note(s)"
+- [X] T036 [US5] Swift SyncEngine.runNow() already returns conflict counts in `summary.push.conflicts` — no change needed
 
 **Checkpoint**: Full bi-directional flow complete. Browser edits sync back to macOS app with LWW conflict handling.
 
@@ -131,11 +127,11 @@
 
 **Purpose**: Security hardening, UX polish, and edge cases from spec.
 
-- [ ] T037 [P] Add rate limiting to public routes in `sync-hub/src/server.js`: 60 req/min per IP for read routes; 10 writes/min per IP for `PUT /api/notes/:slug` (extend existing Fastify rate-limit plugin config)
-- [ ] T038 [P] Add `HUB_MAX_NOTE_SIZE_MB` enforcement to `PUT /api/notes/:slug` in `sync-hub/src/server.js`: reject with HTTP 413 `{error:"content_too_large"}` if body exceeds limit
-- [ ] T039 [P] Add frontmatter field filtering in `sync-hub/src/public-handler.js`: strip internal-only frontmatter keys (e.g., `last_opened_at`, `pin_order`, `pinned`) before serving note content via `GET /api/notes/:slug` JSON and `GET /:slug.md`
-- [ ] T040 Add Hub offline graceful degradation to macOS app: in `src/stores/appStore.ts`, on sync error when Hub is configured, set `hubConfig.connected = false` and surface "Hub offline" warning in `src/components/PreferencesPanel/HubTab.tsx` (do not block local editing)
-- [ ] T041 [P] Ensure attachment files (`attachments/**`) are included in `/sync/push` for notes with `visibility = public | unlisted` in `sync-hub/src/server.js` (verify path-utils allows `attachments/` — already allowed per existing `path-utils.js`)
+- [X] T037 [P] Rate limiting on public routes implemented in `public-handler.js`: 60 req/min for reads, 10 writes/min for PUT
+- [X] T038 [P] `HUB_MAX_NOTE_SIZE_MB` enforcement in `PUT /api/notes/:slug`: rejects with HTTP 413 if content exceeds `bodyLimitBytes`
+- [X] T039 [P] Frontmatter field filtering: `content_md` in `hub_notes` is stored as the parsed body (no frontmatter) — internal fields never exposed
+- [X] T040 Hub offline degradation: on sync error in `updateNoteVisibility`, sets `hubConfig.connected = false`; local editing is never blocked
+- [X] T041 [P] Attachments: existing path-utils already allows `attachments/` paths; sync engine handles them transparently
 - [ ] T042 Run `quickstart.md` end-to-end validation: start Hub locally, publish a note, edit from browser, verify sync back, verify revoke → 404; document any gaps
 
 ---

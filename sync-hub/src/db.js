@@ -21,6 +21,13 @@ export class SyncStore {
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
     this.db.exec(schemaSql);
+    // Best-effort column migrations (SQLite has no ADD COLUMN IF NOT EXISTS)
+    for (const stmt of [
+      "ALTER TABLE hub_notes ADD COLUMN title TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE hub_notes ADD COLUMN content_md TEXT NOT NULL DEFAULT ''",
+    ]) {
+      try { this.db.exec(stmt); } catch { /* column already exists */ }
+    }
     this.log = logger;
 
     this.stmts = {
@@ -82,6 +89,41 @@ export class SyncStore {
       `),
       touchDeviceSeen: this.db.prepare(`
         UPDATE devices SET last_seen_at_ms = ?, last_error = ? WHERE id = ? AND workspace_id = ?
+      `),
+      upsertHubNote: this.db.prepare(`
+        INSERT INTO hub_notes (workspace_id, path, slug, title, visibility, edit_permission, content_md, published_at_ms, updated_at_ms)
+        VALUES (@workspace_id, @path, @slug, @title, @visibility, @edit_permission, @content_md, @published_at_ms, @updated_at_ms)
+        ON CONFLICT(workspace_id, path) DO UPDATE SET
+          slug=excluded.slug,
+          title=excluded.title,
+          visibility=excluded.visibility,
+          edit_permission=excluded.edit_permission,
+          content_md=excluded.content_md,
+          updated_at_ms=excluded.updated_at_ms
+      `),
+      getHubNoteBySlug: this.db.prepare(`
+        SELECT workspace_id, path, slug, title, visibility, edit_permission, content_md, published_at_ms, updated_at_ms
+        FROM hub_notes WHERE slug = ?
+      `),
+      setHubNoteVisibility: this.db.prepare(`
+        UPDATE hub_notes SET visibility = ?, updated_at_ms = ?
+        WHERE workspace_id = ? AND path = ?
+      `),
+      deleteHubNote: this.db.prepare(`
+        DELETE FROM hub_notes WHERE workspace_id = ? AND path = ?
+      `),
+      listPublicHubNotes: this.db.prepare(`
+        SELECT slug, title, path, visibility, edit_permission, updated_at_ms FROM hub_notes
+        WHERE visibility = 'public'
+        ORDER BY updated_at_ms DESC
+        LIMIT ? OFFSET ?
+      `),
+      countPublicHubNotes: this.db.prepare(`
+        SELECT COUNT(*) AS c FROM hub_notes WHERE visibility = 'public'
+      `),
+      getHubNoteByPath: this.db.prepare(`
+        SELECT workspace_id, path, slug, visibility, edit_permission, published_at_ms, updated_at_ms
+        FROM hub_notes WHERE workspace_id = ? AND path = ?
       `),
     };
   }
@@ -177,6 +219,45 @@ export class SyncStore {
       created_at_ms: nowMs,
     });
     return info.lastInsertRowid;
+  }
+
+  upsertHubNote({ workspaceId, path, slug, title = '', visibility, editPermission, contentMd = '', updatedAtMs, nowMs }) {
+    const resolvedNowMs = updatedAtMs ?? nowMs ?? Date.now();
+    const existing = this.stmts.getHubNoteByPath.get(workspaceId, path);
+    const publishedAtMs = existing?.published_at_ms ?? (visibility !== 'private' ? resolvedNowMs : null);
+    this.stmts.upsertHubNote.run({
+      workspace_id: workspaceId,
+      path,
+      slug,
+      title,
+      visibility,
+      edit_permission: editPermission ? 1 : 0,
+      content_md: contentMd,
+      published_at_ms: publishedAtMs,
+      updated_at_ms: resolvedNowMs,
+    });
+  }
+
+  getHubNoteBySlug(slug) {
+    return this.stmts.getHubNoteBySlug.get(slug) ?? null;
+  }
+
+  getHubNoteByPath(workspaceId, path) {
+    return this.stmts.getHubNoteByPath.get(workspaceId, path) ?? null;
+  }
+
+  setHubNoteVisibility(workspaceId, path, visibility, nowMs) {
+    this.stmts.setHubNoteVisibility.run(visibility, nowMs, workspaceId, path);
+  }
+
+  deleteHubNote(workspaceId, path) {
+    this.stmts.deleteHubNote.run(workspaceId, path);
+  }
+
+  listPublicHubNotes({ limit = 50, offset = 0 } = {}) {
+    const rows = this.stmts.listPublicHubNotes.all(limit, offset);
+    const total = this.stmts.countPublicHubNotes.get()?.c ?? 0;
+    return { rows, total };
   }
 
   getNextCursor(workspaceId) {

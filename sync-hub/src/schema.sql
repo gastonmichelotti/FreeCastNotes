@@ -63,3 +63,22 @@ CREATE TABLE IF NOT EXISTS conflicts (
 CREATE INDEX IF NOT EXISTS idx_files_workspace_mtime ON files(workspace_id, mtime_ms DESC);
 CREATE INDEX IF NOT EXISTS idx_changelog_workspace_id ON change_log(workspace_id, id);
 CREATE INDEX IF NOT EXISTS idx_devices_workspace ON devices(workspace_id);
+
+CREATE TABLE IF NOT EXISTS hub_notes (
+  workspace_id    TEXT    NOT NULL,
+  path            TEXT    NOT NULL,
+  slug            TEXT    NOT NULL,
+  title           TEXT    NOT NULL DEFAULT '',
+  visibility      TEXT    NOT NULL DEFAULT 'private'
+                  CHECK (visibility IN ('public', 'unlisted', 'private')),
+  edit_permission INTEGER NOT NULL DEFAULT 0,
+  content_md      TEXT    NOT NULL DEFAULT '',
+  published_at_ms INTEGER,
+  updated_at_ms   INTEGER,
+  PRIMARY KEY (workspace_id, path),
+  FOREIGN KEY (workspace_id, path)
+    REFERENCES files(workspace_id, path) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_hub_notes_slug ON hub_notes(slug);
+CREATE INDEX IF NOT EXISTS idx_hub_notes_visibility ON hub_notes(visibility, workspace_id);

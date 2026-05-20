@@ -272,6 +272,39 @@ class WebViewController: NSViewController, WKScriptMessageHandler, WKNavigationD
                 self?.respond(callId: callId, type: type, result: result)
             }
 
+        case "hubGetConfig":
+            let url = UserDefaults.standard.string(forKey: "hubServerURL") ?? ""
+            let hasToken = KeychainHelper.hasItem(service: "com.freecastnotes.hub", account: "apiToken")
+            respond(callId: callId, type: type, result: ["url": url, "hasToken": hasToken, "connected": false])
+
+        case "hubSetConfig":
+            if let url = payload?["url"] as? String {
+                UserDefaults.standard.set(url, forKey: "hubServerURL")
+            }
+            if let token = payload?["token"] as? String, !token.isEmpty {
+                KeychainHelper.save(token, service: "com.freecastnotes.hub", account: "apiToken")
+            }
+            respond(callId: callId, type: type, result: ["ok": true])
+
+        case "hubTestConnection":
+            Task { [weak self] in
+                let url = UserDefaults.standard.string(forKey: "hubServerURL") ?? ""
+                guard !url.isEmpty, let healthURL = URL(string: url + "/health") else {
+                    self?.respond(callId: callId, type: type, result: ["ok": false, "latencyMs": 0, "error": "Hub URL not configured"])
+                    return
+                }
+                let start = Date()
+                do {
+                    let (_, response) = try await URLSession.shared.data(from: healthURL)
+                    let latencyMs = Int(Date().timeIntervalSince(start) * 1000)
+                    let ok = (response as? HTTPURLResponse)?.statusCode == 200
+                    self?.respond(callId: callId, type: type, result: ["ok": ok, "latencyMs": latencyMs])
+                } catch {
+                    let latencyMs = Int(Date().timeIntervalSince(start) * 1000)
+                    self?.respond(callId: callId, type: type, result: ["ok": false, "latencyMs": latencyMs, "error": error.localizedDescription])
+                }
+            }
+
         default:
             print("Unknown bridge message: \(type)")
         }

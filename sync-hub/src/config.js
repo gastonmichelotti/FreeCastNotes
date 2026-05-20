@@ -34,5 +34,6 @@ export function getConfig() {
     bodyLimitBytes: bodyLimitMb * 1024 * 1024,
     defaultDirection: 'bidirectional',
     defaultConflictPolicy: 'latest_modified_wins',
+    hubBaseUrl: (process.env.HUB_BASE_URL || '').replace(/\/$/, ''),
   };
 }
